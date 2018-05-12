@@ -16,24 +16,24 @@ math(EXPR SUBMINOR_VERSION
 )
 
 project(openpso VERSION ${MAJOR_VERSION}.${MINOR_VERSION}.${SUBMINOR_VERSION} LANGUAGES CXX)
-message(STATUS "lisp")
 
 set(${PROJECT_NAME}_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17")
 
-find_package(OpenCV 2.4 REQUIRED)
+find_package(Boost REQUIRED)
 
 include_directories(
   ${${PROJECT_NAME}_INCLUDE_DIR}
-  ${OpenCV_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
 )
 
-file(GLOB ${PROJECT_NAME}_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+FILE(GLOB ${PROJECT_NAME}_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 if (${PROJECT_NAME}_SOURCES) # 実のところこの条件は必要ない
   foreach(EACH IN LISTS ${PROJECT_NAME}_SOURCES)
     string(REGEX REPLACE "^/(.*/)*(.*).cpp$" "\\2" TARGET ${EACH})
-    message(STATUS "${TARGET}")
     add_executable(${TARGET} ${EACH})
-    target_link_libraries(${TARGET} ${OpenCV_LIBRARIES})
+    target_link_libraries(${TARGET} ${Boost_LIBRARIES})
   endforeach()
 endif()
 
