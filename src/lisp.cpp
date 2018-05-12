@@ -11,7 +11,7 @@
 namespace lisp
 {
   class cell
-    : public std::vector<lisp::cell>
+    : public std::vector<cell>
   {
   public:
     enum class expression_category { list, atom } category;
@@ -29,24 +29,19 @@ namespace lisp
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
     {
-      if (std::distance(first, last) == 0)
+      if (std::distance(first, last) != 0)
       {
-        *this = {};
-        return;
-      }
-
-      if (*first == "(")
-      {
-        category = expression_category::list;
-
-        while (++first != last && *first != ")")
+        if (*first == "(")
         {
-          emplace_back(first, last);
+          while (++first != last && *first != ")")
+          {
+            emplace_back(first, last);
+          }
         }
-      }
-      else
-      {
-        *this = {expression_category::atom, *first};
+        else
+        {
+          *this = {expression_category::atom, *first};
+        }
       }
     }
 
@@ -60,7 +55,7 @@ namespace lisp
         ostream <<  "(";
         for (const auto& each : expression)
         {
-          ostream << std::noshowpoint << each << (&each != &expression.back() ? " " : "");
+          ostream << each << (&each != &expression.back() ? " " : "");
         }
         return ostream << ")";
 
@@ -70,32 +65,31 @@ namespace lisp
     }
   };
 
-  constexpr auto isparen(char c)
-  {
-    return c == '(' or c == ')';
-  }
-
   auto tokenize(const std::string& code)
-    -> std::vector<std::string>
   {
     std::vector<std::string> tokens {};
 
-    auto seek = [&](auto iter) constexpr
+    auto isparen = [](auto c) constexpr
+    {
+      return c == '(' or c == ')';
+    };
+
+    auto find_graph = [&](auto iter) constexpr
     {
       return std::find_if(iter, std::end(code), [](auto c) { return std::isgraph(c); });
     };
 
-    for (auto iter {seek(std::begin(code))};
+    for (auto iter {find_graph(std::begin(code))};
          iter != std::end(code);
-         iter = seek(iter += std::size(tokens.back())))
+         iter = find_graph(iter += std::size(tokens.back())))
     {
       tokens.emplace_back(
         iter,
-        lisp::isparen(*iter) ? iter + 1
-                             : std::find_if(iter, std::end(code), [](auto c)
-                               {
-                                 return lisp::isparen(c) or std::isspace(c);
-                               })
+        isparen(*iter) ? iter + 1
+                       : std::find_if(iter, std::end(code), [&](auto c)
+                         {
+                           return isparen(c) or std::isspace(c);
+                         })
       );
     }
 
@@ -103,8 +97,7 @@ namespace lisp
   }
 
   template <typename CellType>
-  auto evaluate(CellType&& expression, std::map<std::string, lisp::cell>& scope)
-    -> CellType&
+  auto& evaluate(CellType&& expression, std::map<std::string, lisp::cell>& scope)
   {
     using category = lisp::cell::expression_category;
 
@@ -160,7 +153,6 @@ namespace lisp
              parameter != std::end(expression[0][1]) && argument != std::end(expression);
              ++parameter, ++argument)
         {
-          // 変数はより近いスコープで定義されたもので上書きされる
           expression.closure[(*parameter).value] = evaluate(*argument, scope);
         }
 
@@ -194,8 +186,7 @@ namespace lisp
 } // namespace lisp
 
 
-auto main(int argc, char** argv)
-  -> int
+int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
