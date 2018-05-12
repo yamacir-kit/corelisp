@@ -1,300 +1,31 @@
 #include <bits/stdc++.h>
 
-#include <boost/tti/has_member_function.hpp>
 #include <boost/cstdlib.hpp>
-
-
-// ラムダの実装がトンチンカン
+#include <boost/tti/has_member_function.hpp>
 
 
 namespace type_traits
 {
-  BOOST_TTI_HAS_MEMBER_FUNCTION(pop)
-  BOOST_TTI_HAS_MEMBER_FUNCTION(pop_front)
-  BOOST_TTI_HAS_MEMBER_FUNCTION(pop_back)
-}
-
-
-namespace utility
-{
-  template <typename T,
-            typename = typename std::enable_if<
-                                  std::disjunction<
-                                    type_traits::has_member_function_pop<
-                                      void (T::*)(void)
-                                    >,
-                                    type_traits::has_member_function_pop_front<
-                                      void (T::*)(void)
-                                    >,
-                                    type_traits::has_member_function_pop_back<
-                                      void (T::*)(void)
-                                    >
-                                  >::value
-                                >::type>
-  class pop_extended
-    : public T
-  {
-  public:
-    template <typename = typename std::enable_if<
-                                    type_traits::has_member_function_pop_front<
-                                      void (T::*)(void)
-                                    >::value
-                                  >::type,
-              typename = typename std::enable_if<
-                                    std::is_move_constructible<
-                                      typename std::remove_reference<T>::type::value_type
-                                    >::value
-                                  >::type>
-    auto pop_front() noexcept
-    {
-      const typename T::value_type buffer {std::move(T::front())};
-      T::pop_front();
-      return buffer;
-    }
-  };
+  BOOST_TTI_HAS_MEMBER_FUNCTION(pop_front);
 }
 
 
 namespace lisp
 {
-  template <typename CharType>
-  class cell
-    : public std::vector<lisp::cell<CharType>>
-      // public std::unordered_map<std::basic_string<CharType>, lisp::cell<CharType>>
+  auto tokenize(const std::string& code)
+    -> std::list<std::string>
   {
-  public:
-    enum class lexical_category
+    std::cerr << "\ntokenize:" << std::endl;
+
+    auto seek = [&](auto iter) constexpr
     {
-      list, symbol, number, lambda
-    } category;
-
-    using char_type = CharType;
-    std::basic_string<char_type> value;
-
-    // class closure
-    //   : public std::unordered_map<std::basic_string<char_type>, lisp::cell<char_type>>
-    // {
-    // public:
-    //   using base_type = std::unordered_map<std::basic_string<char_type>, lisp::cell<char_type>>;
-    //
-    //   template <template <typename...> typename StandardContainer>
-    //   closure(const StandardContainer<lisp::cell<char_type>>& params,
-    //           const StandardContainer<lisp::cell<char_type>>& args)
-    //   {
-    //     if (std::size(params) < std::size(args))
-    //     {
-    //       std::cerr << "  fatal error. line " << __LINE__ << std::endl;
-    //
-    //       while (std::size(params) < std::size(args))
-    //       {
-    //         params.emplace_back({});
-    //       }
-    //     }
-    //     else if (std::size(args) != std::size(params))
-    //     {
-    //       std::cerr << "  fatal error. line " << __LINE__ << std::endl;
-    //
-    //       while (std::size(args) < std::size(params))
-    //       {
-    //         args.emplace_back({});
-    //       }
-    //     }
-    //
-    //     for (auto param {std::begin(params)}, arg {std::begin(args)}; param != std::end(params); ++param, ++arg)
-    //     {
-    //       (*this)[param->value] = *args;
-    //     }
-    //   }
-    // } closure;
-
-  public:
-    cell(lexical_category category = lexical_category::symbol, const std::basic_string<char_type>& value = "null")
-      : category {category},
-        value {value}
-    {
-      std::cerr << std::endl;
-      std::cerr << "construction: " << std::endl;
-      description(2);
-    }
-
-    template <typename T,
-              typename = typename std::enable_if<
-                                    type_traits::has_member_function_pop_front<
-                                      typename std::remove_reference<T>::type::value_type (std::remove_reference<T>::type::*)(void)
-                                    >::value
-                                  >::type,
-              typename = typename std::enable_if<
-                                    std::is_constructible<
-                                      std::basic_string<char_type>,
-                                      typename std::remove_reference<T>::type::value_type
-                                    >::value
-                                  >::type>
-    cell(T&& tokens)
-    {
-      std::cerr << std::endl;
-      std::cerr << "construction: " << std::endl;
-
-      static const std::basic_regex<char_type> number_regex {"^([+-]?[\\d]+\\.?[\\d]*)$"};
-
-      if (std::empty(tokens))
-      {
-        std::cerr << "  empty tokens passed. therefore, the tokens parsed as \"null\"." << std::endl;
-
-        category = lexical_category::symbol;
-        value = "null";
-
-        description(2);
-
-        return;
-      }
-
-      std::cerr << "  tokens: ";
-      for (const auto& each : tokens)
-      {
-        std::cerr << "\e[1;31m" << each << "\e[0m" << (&each != &tokens.back() ? ", " : "\n");
-      }
-
-      if (auto token {tokens.pop_front()};
-          std::cerr << "  check if token is open parenthesis... ",
-          token == "(")
-      {
-        std::cerr << "match" << std::endl;
-
-        category = lexical_category::list;
-        value = "null";
-
-        description(2);
-
-        while (tokens.front() != ")")
-        {
-          if (tokens.back() != ")")
-          {
-            std::cerr << "  unterminated expression detected, inserted close parenthesis." << std::endl;
-            tokens.emplace_back(")");
-          }
-
-          std::vector<lisp::cell<char_type>>::emplace_back(tokens);
-        }
-
-        tokens.pop_front();
-      }
-      else if (std::cerr << "no match" << std::endl
-                         << "  check if token is number... ",
-               std::regex_match(token, number_regex))
-      {
-        std::cerr << "match" << std::endl;
-
-        category = lexical_category::number;
-        value = token;
-
-        description(2);
-      }
-      else
-      {
-        std::cerr << "no match" << std::endl;
-        std::cerr << "  therefore, this token must be symbol." << std::endl;
-
-        category = lexical_category::symbol;
-        value = token;
-
-        description(2);
-      }
-    }
-
-    friend auto operator<<(std::basic_ostream<char_type>& ostream, lisp::cell<char_type> expression)
-      -> std::basic_ostream<char_type>&
-    {
-      switch (expression.category)
-      {
-      case lisp::cell<char_type>::lexical_category::list:
-        ostream << "(";
-        for (const auto& each : expression)
-        {
-          ostream << each << (&each != &expression.back() ? " " : ")");
-        }
-        break;
-
-      case lisp::cell<char_type>::lexical_category::lambda:
-        ostream << "lambda::" << expression.value;
-        break;
-
-      case lisp::cell<char_type>::lexical_category::symbol:
-        ostream << "symbol::" << expression.value;
-        break;
-
-      case lisp::cell<char_type>::lexical_category::number:
-        ostream << "number::" << expression.value;
-        break;
-      }
-
-      return ostream;
-    }
-
-    friend auto to_string(lexical_category category)
-      -> std::basic_string<char_type>
-    {
-      switch (category)
-      {
-      case lexical_category::symbol:
-        return {"symbol"};
-
-      case lexical_category::number:
-        return {"number"};
-
-      case lexical_category::list:
-        return {"list"};
-
-      case lexical_category::lambda:
-        return {"lambda"};
-
-      default:
-        throw std::logic_error {"lisp::cell<char_type>::to_string() - unimplemented category"};
-      }
-    }
-
-  private:
-    void description(typename std::basic_string<char_type>::size_type indent_size = 0) const
-    {
-      const std::basic_string<char_type> indent (indent_size, ' ');
-      std::cerr << indent << "category: " << to_string(category) << ", value: " << value << std::endl;
-    }
-  };
-
-
-  std::unordered_map<std::string, lisp::cell<char>> global_scope {};
-
-
-  template <typename CharType>
-  auto tokenize(std::basic_string<CharType> raw_code)
-    -> utility::pop_extended<std::list<std::basic_string<CharType>>>
-  {
-    std::cerr << std::endl
-              << "tokenize:" << std::endl;
-
-    utility::pop_extended<std::list<std::basic_string<CharType>>> tokens {};
-
-    auto is_paren = [](auto c) constexpr
-    {
-      return c == '(' || c == ')';
+      return std::find_if(iter, std::end(code), [](auto c) { return std::isgraph(c); });
     };
 
-    auto find_graph = [&](auto iter) constexpr
+    std::list<std::string> tokens {};
+    for (auto iter {seek(std::begin(code))}; iter != std::end(code); iter += std::size(tokens.back()), iter = seek(iter))
     {
-      return std::find_if(iter, std::end(raw_code), [](auto c) { return std::isgraph(c); });
-    };
-
-    for (auto iter {find_graph(std::begin(raw_code))}; iter != std::end(raw_code); iter = find_graph(iter))
-    {
-      tokens.emplace_back(
-        iter,
-        is_paren(*iter) ? iter + 1
-                        : std::find_if(iter, std::end(raw_code), [&](auto c)
-                          {
-                            return is_paren(c) || std::isspace(c);
-                          })
-      );
-
-      iter += std::size(tokens.back());
+      tokens.emplace_back(iter, *iter == '(' or *iter == ')' ? iter + 1 : std::find_if(iter, std::end(code), [](auto c) { return c == '(' or c == ')' or std::isspace(c); }));
     }
 
     std::cerr << "  ";
@@ -304,111 +35,374 @@ namespace lisp
     }
 
     return tokens;
-  }
+  };
 
-  template <typename CharType>
-  auto evaluate(lisp::cell<CharType>& expression)
-    -> lisp::cell<CharType>
+  class cell
+    : public std::vector<lisp::cell>
   {
-    using category = typename lisp::cell<CharType>::lexical_category;
+    using base_type = std::vector<lisp::cell>;
 
-    std::cerr << std::endl;
-    std::cerr << "evaluation:" << std::endl;
-    std::cerr << "  \e[31m" << expression << "\e[0m" << std::endl;
-
-    switch (expression.category)
+  public: // data members
+    enum class lexical_category
     {
-    case category::symbol:
-      if (global_scope.find(expression.value) != std::end(global_scope))
+      list,
+      atom, symbol,
+            number,
+      special,
+      lambda
+    } category;
+
+    // コイツはそもそも設計を間違ってる気がする
+    class scope
+      : public std::list<scope> // 特にここ
+    {
+      using base_type = std::list<scope>;
+
+      static inline std::size_t depth {0}; // デバッグ用
+
+    public:
+      // 別にプライベートでも良いはずだけどデバッグ用に露出させてる
+      std::map<std::string, lisp::cell> local_scope;
+
+      decltype(auto) operator[](const std::string& symbol)
       {
-        return global_scope.at(expression.value);
-      }
-      else // これ要る？
-      {
-        std::cerr << "  undefined symbol \"" << expression.value << "\" requested. return null." << std::endl;
-        return {};
+        return local_scope[symbol];
       }
 
-    case category::number:
-      return expression;
-
-    case category::list:
-      if (std::empty(expression))
+      // eval の仕様が悪いかも知れないんだが、書き換え可能な形で返すのはクソ感漂ってる
+      lisp::cell& find(const std::string& symbol)
       {
-        return {};
-      }
+        std::cerr << "\nsearch:" << std::endl;
+        std::cerr << "  target symbol: " << symbol << std::endl;
+        std::cerr << "  target scope depth: " << depth << std::endl;
 
-      if (expression[0].value == "quote")
-      {
-        if (2 < std::size(expression))
+        static lisp::cell null {};
+
+        if (std::cerr << "  searching local scope... ", local_scope.find(symbol) != std::end(local_scope))
         {
-          std::cerr << "  invalid expression size detected. therefore, index 2 or later will be ignored." << std::endl;
+          std::cerr << "found." << std::endl;
+          return local_scope.at(symbol);
         }
-        return expression[1];
-      }
-      else if (expression[0].value == "cond")
-      {
-        while (std::size(expression) < 4)
+        else
         {
-          std::cerr << "  argument omission detected. unserted null." << std::endl;
-        }
-        return evaluate(
-                 evaluate(expression[1]).value == "true"
-                   ? expression[2]
-                   : expression[3]
-               );
-      }
-      else if (expression[0].value == "define")
-      {
-        return global_scope[expression[1].value] = evaluate(expression[2]);
-      }
-      else if (expression[0].value == "lambda")
-      {
-        expression.category = category::lambda;
-        return expression;
-      }
-      break;
+          std::cerr << "not found." << std::endl;
 
-    case category::lambda:
-      {
-        auto lambda {evaluate(expression[0])};
+          if (!std::empty(*this))
+          {
+            std::cerr << "  search outer scope." << std::endl;
+          }
 
-        for (auto param {std::begin(lambda[1])}, binded {std::begin(expression) + 1};
-             param != std::end(lambda[1]) && binded != std::end(expression);
-             ++param, ++binded)
-        {
-          global_scope[param->value] = evaluate(*binded);
+          for (auto&& each : *this)
+          {
+            if (auto&& found {each.find(symbol)}; found.value != "null")
+            {
+              return found;
+            }
+          }
         }
 
-        return evaluate(lambda[2]);
+        return null;
+      }
+    } closure;
+
+    std::string value;
+
+  public: // constructors
+    cell(lexical_category category = lexical_category::symbol, const std::string& value = "null")
+      : category {category}, value {value}
+    {
+      // std::cerr << "\nconstruction:" << std::endl;
+      // std::cerr << "  cateory: " << category << ", value: " << value << std::endl;
+    }
+
+    cell(const std::string& code)
+      : cell {tokenize(code)}
+    {}
+
+    // 受け取ったコンテナを破壊的に変更するクソ仕様
+    // イテレータを受け取って非破壊的に走査する仕様で作り直すべき
+    //
+    // 既知のバグ：閉じカッコがひとつ足りない時に死ぬ
+    template <typename T,
+              typename = typename std::enable_if<
+                                    type_traits::has_member_function_pop_front<
+                                      void (std::remove_reference<T>::type::*)(void)
+                                    >::value
+                                  >::type,
+              typename = typename std::enable_if<
+                                    std::is_move_constructible<
+                                      // std::string,
+                                      typename std::remove_reference<T>::type::value_type
+                                    >::value
+                                  >::type>
+    cell(T&& tokens)
+    {
+      std::cerr << "\nconstruction:" << std::endl;
+
+      if (std::empty(tokens))
+      {
+        std::cerr << "  empty tokens passed. therefore, this expression parsed as \"null\"." << std::endl;
+        std::cerr << "  category: " << (category = lexical_category::symbol) << ", value: " << (value = "null") << std::endl;
+        return;
+      }
+
+      std::cerr << "  tokens: ";
+      for (const auto& each : tokens)
+      {
+        std::cerr << "\e[1;31m" << each << "\e[0m" << (&each != &tokens.back() ? ", " : "\n");
+      }
+
+      const auto token {std::move(tokens.front())};
+      tokens.pop_front();
+
+      if (std::cerr << "  check if front token is open parenthesis... ", token == "(")
+      {
+        std::cerr << "match." << std::endl;
+        std::cerr << "  therefore, this expression must be list." << std::endl;
+        std::cerr << "  category: " << (category = lexical_category::list) << ", value: " << (value = "evaluation result of this list") << std::endl;
+
+        if (std::empty(tokens))
+        {
+          std::cerr << "  unterminated expression detected, inserted close parenthesis." << std::endl;
+          tokens.emplace_back(")");
+        }
+        else if (tokens.back() != ")")
+        {
+          std::cerr << "  unterminated expression detected, inserted close parenthesis." << std::endl;
+          tokens.emplace_back(")");
+        }
+
+        std::cerr << "  emplace tokens to this list until close parenthesis..." << std::endl;
+        while (tokens.front() != ")")
+        {
+          emplace_back(tokens);
+        }
+
+        // if (std::empty(tokens))
+        // {
+        //   std::cerr << "  unterminated expression detected, inserted close parenthesis." << std::endl;
+        //   tokens.emplace_back(")");
+        // }
+
+        tokens.pop_front();
+      }
+      else
+      {
+        std::cerr << "no match." << std::endl;
+        std::cerr << "  therefore, this expression must be atom." << std::endl;
+        std::cerr << "  category: " << (category = lexical_category::atom) << ", value: " << (value = token) << std::endl;
       }
     }
 
-    std::cerr << "  fatal error. line " << __LINE__ << std::endl;
-    std::exit(boost::exit_failure);
-  }
-} // namespace lisp
+    // ~cell()
+    // {
+    // #ifndef NDEBUG
+    //   std::cerr << "\ndesctuction:" << std::endl;
+    //   std::cerr << "  category: " << category << ", value: " << value << std::endl;
+    // #endif // NDEBUG
+    // }
+
+  public: // friend member functions
+    friend auto evaluate(lisp::cell& expression, lisp::cell::scope& scope)
+      -> lisp::cell
+    {
+      std::cerr << "\nevaluation:" << std::endl;
+      std::cerr << "  expression: \e[31m" << expression << "\e[0m" << std::endl;
+      std::cerr << "  lexical_category: " << expression.category << std::endl;
+
+      static const std::regex number {"^([+-]?[\\d]+\\.?[\\d]*)$"};
+
+      // セルの構築時にはリストかアトムかのみを判別し、eval によって詳細なレキシカルカテゴリが確定する
+      // 引数のレキシカルカテゴリを書き換えるため、二度目に渡した時はパースが早くなる、のだろうか
+
+      switch (expression.category)
+      {
+      case lexical_category::atom:
+        if (std::cerr << "  check if value of the atom is number... ";
+            std::regex_match(expression.value, number))
+        {
+          std::cout << "match." << std::endl;
+          std::cout << "  therefore, this expression evaluated as number." << std::endl;
+          expression.category = lexical_category::number;
+        }
+        else
+        {
+          std::cout << "no match." << std::endl;
+          std::cout << "  therefore, this expression evaluated as symbol." << std::endl;
+          expression.category = lexical_category::symbol;
+        }
+        return evaluate(expression, scope);
+
+      case lexical_category::number:
+        return expression;
+
+      case lexical_category::symbol:
+        return scope.find(expression.value);
+
+      case lexical_category::list:
+        if (std::empty(expression))
+        {
+          return {};
+        }
+        else // リストの先頭は定義済みオペレータのシンボルでなければならない
+        {
+          // TODO 特殊形式は特殊形式で分離しておきたい
+          if (expression[0].value == "quote")
+          {
+            return std::size(expression) < 2 ? lisp::cell {} : expression[1];
+          }
+          else if (expression[0].value == "cond")
+          {
+            while (std::size(expression) < 4)
+            {
+              expression.emplace_back();
+            }
+            return evaluate(evaluate(expression[1], scope).value == "true" ? expression[2] : expression[3], scope);
+          }
+          else if (expression[0].value == "define")
+          {
+            // (define pi 3.14)
+            //   -> スコープに pi の名前で評価した数値を格納
+            //
+            // (define power (lambda (n) (* n n)))
+            //   -> スコープに power の名前で評価したラムダを格納
+            return scope[expression[1].value] = evaluate(expression[2], scope);
+          }
+          else if (expression[0].value == "lambda")
+          {
+            // (lambda (n) (* n n))
+            //   -> レキシカルカテゴリをリストから特殊形式であるラムダに変更
+            //   -> このリストのクロージャに今のスコープを登録（このラムダの定義時に視界内にあったシンボル）
+            expression.category = lexical_category::lambda;
+            expression.closure = scope;
+            return expression;
+          }
+          else
+          {
+            std::cerr << "  no match to any special form." << std::endl;
+            return evaluate(scope.find(expression[0].value), scope);
+          }
+        }
+        break;
+
+      case lexical_category::lambda: // special form に変更すべき
+        {
+          // // (define power (lambda (n) (* n n)))
+          // // ってのが定義してあったとしたら、power ってシンボルからリスト (lambda (n) (* n n)) が引っ張り出せる
+          // // この時点ではラムダはラムダとして認識されていない
+          //
+          // // ここに来てるってことは
+          // // (power 2)
+          // // って式の頭を評価して、power ってシンボルからラムダが返ってきてて、
+          // // ((lambda (n) (* n n)) 2)
+          // // こうなってる
+          // lisp::cell procedure {evaluate(expression[0], scope)}; // これ要る？
+          //
+          // // んで、ラムダの部分が評価の対象になって、先頭のシンボルが lambda であることが判明し、
+          // // レキシカルカテゴリがリストからラムダに修正され、最終的にここに到達している
+          //
+          // // ラムダを評価するにあたって引数 n を評価して、本体の中の n にはこれを参照させないといけない
+          // lisp::cell::scope evaluated_arguments {};
+          // for (const auto& parameter : procedure[1])
+          // {
+          //   evaluated_arguments[parameter] =
+          // }
+          //
+          // evaluated_arguments.push_back(scope);
+          //
+          // // expression[2] -> ラムダの定義本体
+          // // expression[1] -> 引数のリスト
+          // return evaluate(expression[2], evaluated_arguments);
+        }
+        break;
+
+      default:
+        std::cerr << "  fatal error. return null." << std::endl;
+      }
+
+      return {};
+    }
+
+  public: // operators
+    friend auto operator<<(std::ostream& ostream, lexical_category category)
+      -> std::ostream&
+    {
+      switch (category)
+      {
+      case lexical_category::list:
+        ostream << "list";
+        break;
+
+      case lexical_category::atom:
+        ostream << "atom";
+        break;
+
+      case lexical_category::symbol:
+        ostream << "symbol";
+        break;
+
+      case lexical_category::number:
+        ostream << "number";
+        break;
+
+      case lexical_category::special:
+        ostream << "special";
+        break;
+
+      case lexical_category::lambda:
+        ostream << "lambda";
+        break;
+      }
+
+      return ostream;
+    }
+
+    friend auto operator<<(std::ostream& ostream, const lisp::cell& expression)
+      -> std::ostream&
+    {
+      switch (expression.category)
+      {
+      case lexical_category::list:
+      case lexical_category::lambda:
+        ostream << "(";
+        for (const auto& each : expression)
+        {
+          ostream << each << (&each != &expression.back() ? " " : ")");
+        }
+        break;
+
+      default:
+      // #ifndef NDEBUG
+      //   ostream << expression.category << "::";
+      // #endif
+        ostream << expression.value;
+        break;
+      }
+
+      return ostream;
+    }
+  };
+}
 
 
 auto main(int argc, char** argv)
   -> int
 {
-  const std::vector<std::string> args {argv, argv + argc};
+  const std::vector<std::string> args {argv + 1, argv + argc};
 
-  std::list<std::string> history {};
-
-  for (std::string buffer {}; std::cin.good(); history.push_back(buffer))
+  for (auto iter {std::begin(args)}; iter != std::end(args); ++iter)
   {
-    std::cout << "[" << std::size(history) << "]< \e[0;34m" << std::flush;
-    std::getline(std::cin, buffer);
-    std::cout << "\e[0m" << std::flush;
+    // show type information
+  }
 
-    lisp::cell<char> expression {lisp::tokenize(buffer)};
+  lisp::cell::scope global_scope {};
 
-    auto evaluated {lisp::evaluate(expression)};
-
-    std::cerr << std::endl;
-    std::cout << "[" << std::size(history) << "]> \e[0;34m" << evaluated << "\e[0m" << std::endl;
+  std::vector<std::string> history {};
+  for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< \e[0;34m", std::getline(std::cin, buffer), std::cout << "\e[0m"; history.push_back(buffer))
+  {
+    lisp::cell expression {buffer};
+    const auto evaluated {evaluate(expression, global_scope)};
+    std::cout << "\n[" << std::size(history) << "]> \e[0;34m" << evaluated << "\e[0m" << std::endl;
   }
 
   return boost::exit_success;
