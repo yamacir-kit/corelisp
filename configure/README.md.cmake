@@ -1,4 +1,4 @@
-# Pure LISP interpretor by C++17
+# Pure LISP interpreter by C++17
 
 Version ${PROJECT_VERSION} in development.
 
