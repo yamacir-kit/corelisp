@@ -1,4 +1,9 @@
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <string>
+#include <vector>
 
 #include <boost/cstdlib.hpp>
 
@@ -13,7 +18,8 @@ namespace lisp
 
     std::string value;
 
-    std::map<std::string, lisp::cell> closure;
+    using scope_type = std::map<std::string, lisp::cell>;
+    scope_type closure;
 
   public:
     cell(expression_category category = expression_category::list, const std::string& value = "")
@@ -51,10 +57,10 @@ namespace lisp
       switch (expression.category)
       {
       case expression_category::list:
-        ostream << "(";
+        ostream <<  "(";
         for (const auto& each : expression)
         {
-          ostream << each << (&each != &expression.back() ? " " : "");
+          ostream << std::noshowpoint << each << (&each != &expression.back() ? " " : "");
         }
         return ostream << ")";
 
@@ -144,18 +150,8 @@ namespace lisp
         return expression;
       }
 
-      // [predefined] (define add (lambda (lhs rhs) (+ lhs rhs)))
-      // [evaluating] (add 1 2 3 4)
-
-      // (add 1 2) -> ((lambda (lhs rhs) (+ lhs rhs)) 1 2 3 4)
       expression[0] = evaluate(expression[0], scope);
-
-      expression.closure = scope; // 現在のスコープをコピー
-
-      // ((lambda (lhs rhs) (+ lhs rhs)) 1 2 3 4)
-      //  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~~~~
-      //  ~~~~~~~ ~~~~~~~~~ ~~~~~~~~~~~  ex[1]
-      //          ex[0][1]  ex[0][2]
+      expression.closure = scope;
 
       switch (expression[0].category)
       {
@@ -204,7 +200,7 @@ auto main(int argc, char** argv)
   const std::vector<std::string> args {argv + 1, argv + argc};
 
   using category = lisp::cell::expression_category;
-  std::map<std::string, lisp::cell> scope
+  lisp::cell::scope_type scope
   {
     {"nil",   {category::atom, "nil"}},
     {"true",  {category::atom, "true"}},
@@ -219,7 +215,6 @@ auto main(int argc, char** argv)
     lisp::cell expression {std::begin(tokens), std::end(tokens)};
 
     std::cout << "[" << std::size(history) << "]> " << lisp::evaluate(expression, scope) << std::endl;
-    // std::cout << "[" << std::size(history) << "]> " << expression << std::endl;
   }
 
   return boost::exit_success;
