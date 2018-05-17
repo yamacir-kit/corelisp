@@ -1,11 +1,8 @@
 #include <algorithm>
-#include <functional>
 #include <iostream>
 #include <iterator>
 #include <map>
 #include <string>
-#include <type_traits>
-#include <utility>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -74,31 +71,6 @@ namespace lisp
       }
     }
   };
-
-
-  template <typename Function>
-  class procedure
-    : public Function,
-      public cell
-  {
-  public:
-    template <typename... Ts>
-    procedure(Ts&&... args)
-      : Function {std::forward<Ts>(args)...},
-        cell {cell::expression_category::atom, "procedure"}
-    {}
-
-    virtual ~procedure() = default;
-  };
-
-
-  // プロシージャ定義のためのヘルパ関数。引数には関数オブジェクトを与える。
-  template <typename... Ts>
-  constexpr auto make_procedure(const std::string& token, Ts&&... args)
-    -> procedure<typename std::decay<Ts>::type...>
-  {
-    return {std::forward<Ts>(args)...};
-  }
 
 
   auto tokenize(const std::string& code)
@@ -183,13 +155,13 @@ namespace lisp
       else if (expression[0].value == "lambda")
       {
         debug();
-        expression.closure = scope;
         return expression;
       }
 
       debug();
       // XXX ここで組み込みプロシージャに対してユーザ定義変数か否かの問い合わせが発生している
       expression[0] = evaluate(expression[0], scope);
+      expression.closure = scope;
 
       switch (expression[0].category)
       {
@@ -208,28 +180,25 @@ namespace lisp
 
       case category::atom:
         debug();
-
-        using function_type = std::function<cell& (cell&, cell::scope_type&)>;
-        if (auto* proc {dynamic_cast<procedure<function_type>*>(&expression[0])}; proc != nullptr)
+        for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
         {
-          return (*proc)(expression, scope);
+          *iter = evaluate(*iter, scope);
+        }
+
+        if (expression[0].value == "+")
+        {
+          double buffer {0.0};
+          for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
+          {
+            buffer += std::stod(iter->value);
+          }
+
+          expression.category = category::atom;
+          expression.value = std::to_string(buffer);
+
+          return expression;
         }
         else error();
-
-        // if (expression[0].value == "+")
-        // {
-        //   double buffer {0.0};
-        //   for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
-        //   {
-        //     buffer += std::stod(evaluate(*iter, expression.closure).value);
-        //   }
-        //
-        //   expression.category = category::atom;
-        //   expression.value = std::to_string(buffer);
-        //
-        //   return expression;
-        // }
-        break;
       }
       break;
     }
@@ -248,26 +217,9 @@ int main(int argc, char** argv)
   {
     {"nil",   {category::atom, "nil"}},
     {"true",  {category::atom, "true"}},
-    {"false", {category::atom, "false"}}
+    {"false", {category::atom, "false"}},
+    {"+",     {category::atom, "+"}}
   };
-
-  scope["+"] = lisp::make_procedure("+", [](auto& expression, auto& scope) -> decltype(auto)
-  {
-    debug();
-    double buffer {0.0};
-    for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
-    {
-      buffer += std::stod(evaluate(*iter, expression.closure).value);
-    }
-    debug();
-
-    expression.category = lisp::cell::expression_category::atom;
-    expression.value = std::to_string(buffer);
-
-    debug();
-
-    return expression;
-  });
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
