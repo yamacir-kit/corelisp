@@ -8,8 +8,8 @@
 #include <boost/cstdlib.hpp>
 
 
-#define debug(...) std::cerr << "(\e[32mdebug \e[31m" << expression << " \e[36m" << __LINE__ << "\e[0m) -> ";
-#define error(...) std::cerr << "(\e[32merror \e[31m" << expression << " \e[36m" << __LINE__ << "\e[0m)" << std::endl; std::exit(boost::exit_failure);
+#define debug(...) std::cerr << "(\e[32mdebug \e[31m" << expr << " \e[36m" << __LINE__ << "\e[0m) -> ";
+#define error(...) std::cerr << "(\e[32merror \e[31m" << expr << " \e[36m" << __LINE__ << "\e[0m)" << std::endl; std::exit(boost::exit_failure);
 
 
 namespace lisp
@@ -18,7 +18,7 @@ namespace lisp
     : public std::vector<cell>
   {
   public:
-    enum class expression_category { list, atom } category;
+    enum class expr_category { list, atom } category;
 
     std::string value;
 
@@ -26,18 +26,18 @@ namespace lisp
     scope_type closure;
 
   public:
-    cell(expression_category category = expression_category::list, const std::string& value = "")
+    cell(expr_category category = expr_category::list, const std::string& value = "")
       : category {category}, value {value}
     {}
 
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
+      : category {expr_category::list}
     {
       if (std::distance(first, last) != 0)
       {
         if (*first == "(")
         {
-          category = expression_category::list;
           while (++first != last && *first != ")")
           {
             emplace_back(first, last);
@@ -45,7 +45,7 @@ namespace lisp
         }
         else
         {
-          *this = {expression_category::atom, *first};
+          *this = {expr_category::atom, *first};
         }
       }
     }
@@ -53,21 +53,21 @@ namespace lisp
     virtual ~cell() = default;
 
   public:
-    friend auto operator<<(std::ostream& ostream, const lisp::cell& expression)
+    friend auto operator<<(std::ostream& ostream, const lisp::cell& expr)
       -> std::ostream&
     {
-      switch (expression.category)
+      switch (expr.category)
       {
-      case expression_category::list:
+      case expr_category::list:
         ostream <<  "(";
-        for (const auto& each : expression)
+        for (const auto& each : expr)
         {
-          ostream << each << (&each != &expression.back() ? " " : "");
+          ostream << each << (&each != &expr.back() ? " " : "");
         }
         return ostream << ")";
 
       default:
-        return ostream << expression.value;
+        return ostream << expr.value;
       }
     }
   };
@@ -106,104 +106,94 @@ namespace lisp
 
 
   template <typename Cell>
-  auto& evaluate(Cell&& expression, std::map<std::string, lisp::cell>& scope)
+  auto& evaluate(Cell&& expr, std::map<std::string, lisp::cell>& scope)
   {
-    using category = lisp::cell::expression_category;
+    using category = lisp::cell::expr_category;
 
-    switch (expression.category)
+    switch (expr.category)
     {
     case category::atom:
-      debug();
       try
       {
-        std::stod(expression.value);
+        std::stod(expr.value);
       }
       catch (const std::logic_error&)
       {
-        return scope[expression.value];
+        return scope[expr.value];
       }
       break;
 
     case category::list:
-      if (std::empty(expression))
+      if (std::empty(expr))
       {
-        debug();
-        expression.category = category::atom;
-        expression.value = "nil";
+        expr.category = category::atom;
+        expr.value = "nil";
         break;
       }
 
-      if (expression[0].value == "quote")
+      if (expr[0].value == "quote")
       {
-        debug();
-        return std::size(expression) < 2 ? scope["nil"] : expression[1];
+        return std::size(expr) < 2 ? scope["nil"] : expr[1];
       }
-      else if (expression[0].value == "cond")
+      else if (expr[0].value == "cond")
       {
-        debug();
-        while (std::size(expression) < 4)
+        while (std::size(expr) < 4)
         {
-          expression.emplace_back();
+          expr.emplace_back();
         }
-        return evaluate(evaluate(expression[1], scope).value == "true" ? expression[2] : expression[3], scope);
+        return evaluate(evaluate(expr[1], scope).value == "true" ? expr[2] : expr[3], scope);
       }
-      else if (expression[0].value == "define")
+      else if (expr[0].value == "define")
       {
-        debug();
-        return scope[expression[1].value] = evaluate(expression[2], scope);
+        return scope[expr[1].value] = evaluate(expr[2], scope);
       }
-      else if (expression[0].value == "lambda")
+      else if (expr[0].value == "lambda")
       {
-        debug();
-        return expression;
+        return expr;
       }
 
-      debug();
-      // XXX ここで組み込みプロシージャに対してユーザ定義変数か否かの問い合わせが発生している
-      expression[0] = evaluate(expression[0], scope);
-      expression.closure = scope;
+      expr[0] = evaluate(expr[0], scope);
+      expr.closure = scope;
 
-      switch (expression[0].category)
+      switch (expr[0].category)
       {
       case category::list:
-        debug();
-        for (std::size_t index {0}; index < std::size(expression[0][1]); ++index)
+        for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
         {
-          expression.closure[expression[0][1][index].value] = evaluate(expression[index + 1], scope);
+          expr.closure[expr[0][1][index].value] = evaluate(expr[index + 1], scope);
         }
 
-        if (expression[0][0].value == "lambda")
+        if (expr[0][0].value == "lambda")
         {
-          return evaluate(expression[0][2], expression.closure);
+          return evaluate(expr[0][2], expr.closure);
         }
         else error();
 
       case category::atom:
-        debug();
-        for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
+        for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
         {
           *iter = evaluate(*iter, scope);
         }
 
-        if (expression[0].value == "+")
+        if (expr[0].value == "+")
         {
           double buffer {0.0};
-          for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
+          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
           {
             buffer += std::stod(iter->value);
           }
 
-          expression.category = category::atom;
-          expression.value = std::to_string(buffer);
+          expr.category = category::atom;
+          expr.value = std::to_string(buffer);
 
-          return expression;
+          return expr;
         }
         else error();
       }
       break;
     }
 
-    return expression;
+    return expr;
   }
 } // namespace lisp
 
@@ -212,7 +202,7 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
-  using category = lisp::cell::expression_category;
+  using category = lisp::cell::expr_category;
   lisp::cell::scope_type scope
   {
     {"nil",   {category::atom, "nil"}},
