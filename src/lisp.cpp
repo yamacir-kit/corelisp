@@ -8,6 +8,10 @@
 #include <boost/cstdlib.hpp>
 
 
+#define debug(...) std::cerr << "(\e[32mdebug \e[31m" << expression << " \e[36m" << __LINE__ << "\e[0m) -> ";
+#define error(...) std::cerr << "(\e[32merror \e[31m" << expression << " \e[36m" << __LINE__ << "\e[0m)" << std::endl; std::exit(boost::exit_failure);
+
+
 namespace lisp
 {
   class cell
@@ -33,6 +37,7 @@ namespace lisp
       {
         if (*first == "(")
         {
+          category = expression_category::list;
           while (++first != last && *first != ")")
           {
             emplace_back(first, last);
@@ -44,6 +49,8 @@ namespace lisp
         }
       }
     }
+
+    virtual ~cell() = default;
 
   public:
     friend auto operator<<(std::ostream& ostream, const lisp::cell& expression)
@@ -64,6 +71,7 @@ namespace lisp
       }
     }
   };
+
 
   auto tokenize(const std::string& code)
   {
@@ -96,27 +104,30 @@ namespace lisp
     return tokens;
   }
 
-  template <typename CellType>
-  auto& evaluate(CellType&& expression, std::map<std::string, lisp::cell>& scope)
+
+  template <typename Cell>
+  auto& evaluate(Cell&& expression, std::map<std::string, lisp::cell>& scope)
   {
     using category = lisp::cell::expression_category;
 
     switch (expression.category)
     {
     case category::atom:
+      debug();
       try
       {
         std::stod(expression.value);
       }
-      catch (const std::logic_error&) // 数値への変換に失敗する、つまり数字ではないシンボル
+      catch (const std::logic_error&)
       {
         return scope[expression.value];
       }
       break;
 
     case category::list:
-      if (std::empty(expression)) // 空のリストは nil に評価される
+      if (std::empty(expression))
       {
+        debug();
         expression.category = category::atom;
         expression.value = "nil";
         break;
@@ -124,10 +135,12 @@ namespace lisp
 
       if (expression[0].value == "quote")
       {
+        debug();
         return std::size(expression) < 2 ? scope["nil"] : expression[1];
       }
       else if (expression[0].value == "cond")
       {
+        debug();
         while (std::size(expression) < 4)
         {
           expression.emplace_back();
@@ -136,39 +149,48 @@ namespace lisp
       }
       else if (expression[0].value == "define")
       {
+        debug();
         return scope[expression[1].value] = evaluate(expression[2], scope);
       }
       else if (expression[0].value == "lambda")
       {
+        debug();
         return expression;
       }
 
+      debug();
+      // XXX ここで組み込みプロシージャに対してユーザ定義変数か否かの問い合わせが発生している
       expression[0] = evaluate(expression[0], scope);
       expression.closure = scope;
 
       switch (expression[0].category)
       {
       case category::list:
-        for (auto parameter {std::begin(expression[0][1])}, argument {std::begin(expression) + 1};
-             parameter != std::end(expression[0][1]) && argument != std::end(expression);
-             ++parameter, ++argument)
+        debug();
+        for (std::size_t index {0}; index < std::size(expression[0][1]); ++index)
         {
-          expression.closure[(*parameter).value] = evaluate(*argument, scope);
+          expression.closure[expression[0][1][index].value] = evaluate(expression[index + 1], scope);
         }
 
         if (expression[0][0].value == "lambda")
         {
           return evaluate(expression[0][2], expression.closure);
         }
-        break;
+        else error();
 
       case category::atom:
+        debug();
+        for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
+        {
+          *iter = evaluate(*iter, scope);
+        }
+
         if (expression[0].value == "+")
         {
           double buffer {0.0};
           for (auto iter {std::begin(expression) + 1}; iter != std::end(expression); ++iter)
           {
-            buffer += std::stod(evaluate(*iter, expression.closure).value);
+            buffer += std::stod(iter->value);
           }
 
           expression.category = category::atom;
@@ -176,7 +198,7 @@ namespace lisp
 
           return expression;
         }
-        break;
+        else error();
       }
       break;
     }
@@ -203,12 +225,9 @@ int main(int argc, char** argv)
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
     const auto tokens {lisp::tokenize(buffer)};
-    lisp::cell expression {std::begin(tokens), std::end(tokens)};
-
-    std::cout << "[" << std::size(history) << "]> " << lisp::evaluate(expression, scope) << std::endl;
+    std::cout << "[" << std::size(history) << "]> " << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
   }
 
   return boost::exit_success;
 }
-
 
