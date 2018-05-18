@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -50,10 +51,8 @@ namespace lisp
       }
     }
 
-    virtual ~cell() = default;
-
   public:
-    friend auto operator<<(std::ostream& ostream, const lisp::cell& expr)
+    friend auto operator<<(std::ostream& ostream, const cell& expr)
       -> std::ostream&
     {
       switch (expr.category)
@@ -96,7 +95,7 @@ namespace lisp
         isparen(*iter) ? iter + 1
                        : std::find_if(iter, std::end(code), [&](auto c)
                          {
-                           return isparen(c) or std::isspace(c);
+                           return isparen(c) || std::isspace(c);
                          })
       );
     }
@@ -106,9 +105,9 @@ namespace lisp
 
 
   template <typename Cell>
-  auto& evaluate(Cell&& expr, std::map<std::string, lisp::cell>& scope)
+  auto& evaluate(Cell&& expr, std::map<std::string, cell>& scope)
   {
-    using category = lisp::cell::expr_category;
+    using category = cell::expr_category;
 
     switch (expr.category)
     {
@@ -135,7 +134,8 @@ namespace lisp
       {
         return std::size(expr) < 2 ? scope["nil"] : expr[1];
       }
-      else if (expr[0].value == "cond")
+
+      if (expr[0].value == "cond")
       {
         while (std::size(expr) < 4)
         {
@@ -143,11 +143,13 @@ namespace lisp
         }
         return evaluate(evaluate(expr[1], scope).value == "true" ? expr[2] : expr[3], scope);
       }
-      else if (expr[0].value == "define")
+
+      if (expr[0].value == "define")
       {
         return scope[expr[1].value] = evaluate(expr[2], scope);
       }
-      else if (expr[0].value == "lambda")
+
+      if (expr[0].value == "lambda")
       {
         return expr;
       }
@@ -177,11 +179,12 @@ namespace lisp
 
         if (expr[0].value == "+")
         {
-          double buffer {0.0};
-          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-          {
-            buffer += std::stod(iter->value);
-          }
+          const auto buffer {std::accumulate(std::begin(expr) + 1, std::end(expr), 0.0,
+            [](auto lhs, auto rhs)
+            {
+              return lhs + std::stod(rhs.value);
+            }
+          )};
 
           expr.category = category::atom;
           expr.value = std::to_string(buffer);
@@ -190,7 +193,6 @@ namespace lisp
         }
         else error();
       }
-      break;
     }
 
     return expr;
@@ -207,7 +209,6 @@ int main(int argc, char** argv)
   {
     {"nil",   {category::atom, "nil"}},
     {"true",  {category::atom, "true"}},
-    {"false", {category::atom, "false"}},
     {"+",     {category::atom, "+"}}
   };
 
