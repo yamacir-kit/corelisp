@@ -171,7 +171,7 @@ namespace lisp
           *iter = evaluate(*iter, scope);
         }
 
-        if (expr[0].value == "+")
+        if (expr[0].value == "+") try
         {
           const auto buffer {std::accumulate(std::begin(expr) + 1, std::end(expr), 0.0,
             [](auto lhs, auto rhs)
@@ -185,7 +185,13 @@ namespace lisp
 
           return expr;
         }
-        else error();
+        catch (std::invalid_argument&)
+        {
+          std::cerr << "An undefined symbol or a non-numeric token is passed to procedure \"+\"." << std::endl;
+          return scope["nil"];
+        }
+
+        error();
       }
     }
 
@@ -204,7 +210,7 @@ int main(int argc, char** argv)
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
     const auto tokens {lisp::tokenize(buffer)};
-    std::cout << "[" << std::size(history) << "]> " << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
+    std::cout << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
   }
 
   return boost::exit_success;
