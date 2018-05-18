@@ -105,7 +105,8 @@ namespace lisp
 
 
   template <typename Cell>
-  auto& evaluate(Cell&& expr, std::map<std::string, cell>& scope)
+  auto evaluate(Cell&& expr, std::map<std::string, cell>& scope)
+    -> typename std::remove_reference<Cell>::type&
   {
     using category = cell::expr_category;
 
@@ -116,9 +117,9 @@ namespace lisp
       {
         std::stod(expr.value);
       }
-      catch (const std::logic_error&)
+      catch (...)
       {
-        return scope[expr.value];
+        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
       }
       break;
 
@@ -204,13 +205,13 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
-  using category = lisp::cell::expr_category;
-  lisp::cell::scope_type scope
-  {
-    {"nil",   {category::atom, "nil"}},
-    {"true",  {category::atom, "true"}},
-    {"+",     {category::atom, "+"}}
-  };
+  // using category = lisp::cell::expr_category;
+  lisp::cell::scope_type scope {};
+  // {
+  //   {"nil",   {category::atom, "nil"}},
+  //   {"true",  {category::atom, "true"}}
+  //   {"+",     {category::atom, "+"}}
+  // };
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
