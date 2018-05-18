@@ -113,22 +113,15 @@ namespace lisp
     switch (expr.category)
     {
     case category::atom:
-      try
-      {
-        std::stod(expr.value);
-      }
-      catch (...)
-      {
-        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
-      }
-      break;
+      // 未定義変数はセルをオウム返しする。
+      // 非数値かつ未定義変数がプロシージャに投入された時の例外処理を追加すること
+      return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
     case category::list:
+      // 空のリストはNILに評価される
       if (std::empty(expr))
       {
-        expr.category = category::atom;
-        expr.value = "nil";
-        break;
+        return expr = {category::atom, "nil"};
       }
 
       if (expr[0].value == "quote")
@@ -205,13 +198,7 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
-  // using category = lisp::cell::expr_category;
   lisp::cell::scope_type scope {};
-  // {
-  //   {"nil",   {category::atom, "nil"}},
-  //   {"true",  {category::atom, "true"}}
-  //   {"+",     {category::atom, "+"}}
-  // };
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
