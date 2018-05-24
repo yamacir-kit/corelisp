@@ -19,7 +19,7 @@ namespace lisp
     : public std::vector<cell>
   {
   public:
-    enum class expr_category { list, atom } category;
+    enum class type { list, atom } state;
 
     std::string value;
 
@@ -27,15 +27,15 @@ namespace lisp
     scope_type closure;
 
   public:
-    cell(expr_category category = expr_category::list, const std::string& value = "")
-      : category {category}, value {value}
+    cell(type state = type::list, const std::string& value = "")
+      : state {state}, value {value}
     {}
 
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
-      : category {expr_category::list}
+      : state {type::list}
     {
-      if (std::distance(first, last) != 0)
+      if (std::distance(first, last) != 0) // サイズゼロのリストはNIL
       {
         if (*first == "(")
         {
@@ -46,7 +46,7 @@ namespace lisp
         }
         else
         {
-          *this = {expr_category::atom, *first};
+          *this = {type::atom, *first};
         }
       }
     }
@@ -55,9 +55,9 @@ namespace lisp
     friend auto operator<<(std::ostream& ostream, const cell& expr)
       -> std::ostream&
     {
-      switch (expr.category)
+      switch (expr.state)
       {
-      case expr_category::list:
+      case type::list:
         ostream <<  "(";
         for (const auto& each : expr)
         {
@@ -108,20 +108,18 @@ namespace lisp
   auto evaluate(Cell&& expr, std::map<std::string, cell>& scope)
     -> typename std::remove_reference<Cell>::type&
   {
-    using category = cell::expr_category;
-
-    switch (expr.category)
+    switch (expr.state)
     {
-    case category::atom:
+    case cell::type::atom:
       // 未定義変数はセルをオウム返しする。
       // 非数値かつ未定義変数がプロシージャに投入された時の例外処理を追加すること
       return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
-    case category::list:
+    case cell::type::list:
       // 空のリストはNILに評価される
       if (std::empty(expr))
       {
-        return expr = {category::atom, "nil"};
+        return expr = {cell::type::atom, "nil"};
       }
 
       if (expr[0].value == "quote")
@@ -140,6 +138,10 @@ namespace lisp
 
       if (expr[0].value == "define")
       {
+        while (std::size(expr) < 3)
+        {
+          expr.emplace_back();
+        }
         return scope[expr[1].value] = evaluate(expr[2], scope);
       }
 
@@ -151,9 +153,9 @@ namespace lisp
       expr[0] = evaluate(expr[0], scope);
       expr.closure = scope;
 
-      switch (expr[0].category)
+      switch (expr[0].state)
       {
-      case category::list:
+      case cell::type::list:
         for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
         {
           expr.closure[expr[0][1][index].value] = evaluate(expr[index + 1], scope);
@@ -163,9 +165,9 @@ namespace lisp
         {
           return evaluate(expr[0][2], expr.closure);
         }
-        else error();
+        break;
 
-      case category::atom:
+      case cell::type::atom:
         for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
         {
           *iter = evaluate(*iter, scope);
@@ -180,22 +182,19 @@ namespace lisp
             }
           )};
 
-          expr.category = category::atom;
-          expr.value = std::to_string(buffer);
-
-          return expr;
+          return expr = {cell::type::atom, std::to_string(buffer)};
         }
         catch (std::invalid_argument&)
         {
           std::cerr << "An undefined symbol or a non-numeric token is passed to procedure \"+\"." << std::endl;
           return scope["nil"];
         }
-
-        error();
+        break;
       }
     }
 
-    return expr;
+    std::cerr << "(error \e[31m" << expr << "\e[0m)" << std::endl;
+    std::exit(boost::exit_failure);
   }
 } // namespace lisp
 
