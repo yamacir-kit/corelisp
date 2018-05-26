@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/lexical_cast.hpp>
 
 
 namespace lisp
@@ -397,6 +398,41 @@ namespace lisp
 
     std::exit(boost::exit_failure);
   }
+
+
+  template <template <typename...> typename BinaryOperaor, typename T>
+  class numeric_procedure
+  {
+  public:
+    template <typename... Ts>
+    using binary_operator = BinaryOperaor<Ts...>;
+
+    using value_type = T;
+
+    cell& operator()(cell& expr, cell::scope_type& scope) try
+    {
+      std::vector<value_type> buffer {};
+
+      for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+      {
+        *iter = evaluate(*iter, scope);
+        buffer.push_back(boost::lexical_cast<value_type>(*iter));
+        // buffer.emplace_back(iter->value);
+      }
+
+      const auto result {std::accumulate(
+        std::begin(buffer) + 1, std::end(buffer), buffer.front(), binary_operator<value_type> {}
+      )};
+
+      // return expr = {cell::type::atom, boost::lexical_cast<std::string>(result)};
+      return expr = {cell::type::atom, result.str()};
+    }
+    catch (std::exception& exception)
+    {
+      std::cerr << "(error " << expr << " \"" << exception.what() << "\")" << std::endl;
+      return expr = scope["nil"];
+    }
+  };
 } // namespace lisp
 
 
