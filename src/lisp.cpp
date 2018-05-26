@@ -11,6 +11,7 @@
 
 #include <boost/cstdlib.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 
 
 namespace lisp
@@ -416,8 +417,8 @@ namespace lisp
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
         *iter = evaluate(*iter, scope);
-        buffer.push_back(boost::lexical_cast<value_type>(*iter));
-        // buffer.emplace_back(iter->value);
+        // buffer.push_back(boost::lexical_cast<value_type>(*iter));
+        buffer.emplace_back(iter->value);
       }
 
       const auto result {std::accumulate(
@@ -441,6 +442,16 @@ int main(int argc, char** argv)
   const std::vector<std::string> args {argv + 1, argv + argc};
 
   // lisp::cell::scope_type scope {};
+
+  {
+    using namespace lisp;
+    using namespace boost::multiprecision;
+
+    evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
+    evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
+    evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
+    evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
+  }
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
