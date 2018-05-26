@@ -11,6 +11,22 @@
 
 namespace lisp
 {
+  class tokenizer
+    : public std::vector<std::string>
+  {
+  public:
+    auto& operator()(const std::string& s)
+    {
+      return *this;
+    }
+
+    template <typename T>
+    static constexpr bool is_round_brackets(T&& c)
+    {
+      return c == '(' || c == ')';
+    }
+  };
+
   class cell
     : public std::vector<cell>
   {
