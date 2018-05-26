@@ -5,8 +5,11 @@
 #include <locale> // std::isgraph, std::isspace
 #include <map>
 #include <numeric> // std::accumulate
+#include <regex>
+#include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -153,6 +156,52 @@ namespace lisp
         return ostream << expr.value;
       }
     }
+
+    // デバッグ用のシンタックスハイライタ
+    // 指定された文字列部分を強調表示するエスケープシーケンスを混ぜ込んだセルの文字列を返す
+    auto highlight(const std::string& target)
+    {
+      std::stringstream sstream {}, pattern {};
+      sstream << *this;
+      pattern << "^(.*)(" << escape_regex_specials(target) << ")(.*)$";
+      return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
+    }
+
+    decltype(auto) highlight(const cell& expr)
+    {
+      if (expr.state != type::atom)
+      {
+        std::stringstream sstream {};
+        sstream << expr;
+        return highlight(sstream.str());
+      }
+      else
+      {
+        return highlight(expr.value);
+      }
+    }
+
+  protected:
+    auto escape_regex_specials(const std::string& s)
+      -> std::string
+    {
+      auto buffer {s};
+
+      static const std::vector<std::string> regex_specials // 多分足りない
+      {
+        "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
+      };
+
+      for (const auto& special : regex_specials)
+      {
+        for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
+        {
+          buffer.replace(pos, 1, std::string {"\\"} + special);
+        }
+      }
+
+      return buffer;
+    }
   };
 
 
@@ -187,6 +236,7 @@ namespace lisp
         // ラムダか組み込みプロシージャの別名である可能性しか残ってないので、一先ずCAR部分を評価にかける。
         // 既知のシンボルであった場合はバインドされた式が返ってくる。
         // 未知のシンボルであった場合はシンボル名がオウム返しされてくる。
+        std::cerr << expr.highlight(expr[0]) << std::endl;
         switch (expr[0] = (*this)(expr[0], scope); expr[0].state)
         {
         case cell::type::list:
@@ -201,10 +251,12 @@ namespace lisp
             // クロージャ（ラムダ定義時のスコープ）へ仮引数名をキーに実引数を評価して格納する。
             for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
             {
+              std::cerr << expr.highlight(expr[index + 1]) << std::endl;
               expr.closure[expr[0][1][index].value] = (*this)(expr[index + 1], scope);
             }
 
             // ラムダ本体の部分を評価する。仮引数名と評価済み実引数の対応はクロージャが知っている。
+            std::cerr << expr.highlight(expr[0][2]) << std::endl;
             return (*this)(expr[0][2], expr.closure);
           }
           else // ここに来るということは多分ラムダのタイポか何か。
@@ -249,8 +301,8 @@ namespace lisp
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
+        std::cerr << expr.highlight(*iter) << std::endl;
         *iter = evaluate(*iter, scope);
-        assert((*iter).state == cell::type::atom);
         buffer.emplace_back(iter->value);
       }
 
@@ -290,7 +342,12 @@ int main(int argc, char** argv)
       {
         expr.emplace_back();
       }
-      return evaluate(evaluate(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
+      return evaluate(
+               (std::cerr << expr.highlight(expr[1]) << std::endl, evaluate(expr[1], scope).value != "nil")
+                 ? (std::cerr << expr.highlight(expr[2]) << std::endl, expr[2])
+                 : (std::cerr << expr.highlight(expr[3]) << std::endl, expr[3]),
+               scope
+             );
     };
 
     evaluate["define"] = [&](auto& expr, auto& scope)
@@ -300,6 +357,7 @@ int main(int argc, char** argv)
       {
         expr.emplace_back();
       }
+      std::cerr << expr.highlight(expr[2]) << std::endl;
       return scope[expr[1].value] = evaluate(expr[2], scope);
     };
 
@@ -307,6 +365,12 @@ int main(int argc, char** argv)
       -> decltype(auto)
     {
       expr.closure = scope;
+
+      // for (const auto& each : expr.closure)
+      // {
+      //   std::cerr << "  \e[32mclosure[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
+      // }
+
       return expr;
     };
 
@@ -316,10 +380,26 @@ int main(int argc, char** argv)
     evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
   }
 
+  {
+    const std::vector<std::string> prelude
+    {
+      "(define cons (lambda (a d) (lambda (f) (f a d))))",
+
+      "(define car (lambda (ad) (ad (lambda (a d) a))))",
+      "(define cdr (lambda (ad) (ad (lambda (a d) d))))",
+    };
+
+    for (auto iter {std::begin(prelude)}; iter != std::end(prelude); ++iter)
+    {
+      std::cerr << "prelude[" << std::distance(std::begin(prelude), iter) << "]< " << *iter << std::endl;
+      std::cerr << lisp::evaluate(*iter) << "\n\n";
+    }
+  }
+
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    std::cout << lisp::evaluate(buffer) << std::endl;
+    std::cout << lisp::evaluate(buffer) << "\n\n";
   }
 
   return boost::exit_success;
