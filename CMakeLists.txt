@@ -13,7 +13,7 @@ project(lisp VERSION ${MAJOR_VERSION}.${MINOR_VERSION}.${SUBMINOR_VERSION} LANGU
 
 set(${PROJECT_NAME}_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(CMAKE_BUILD_TYPE release)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O3")
 
 find_package(Boost REQUIRED)
 

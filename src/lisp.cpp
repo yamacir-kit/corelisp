@@ -10,6 +10,8 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 
 
 namespace lisp
@@ -194,43 +196,6 @@ namespace lisp
   public:
     using signature = std::function<cell& (cell&, cell::scope_type&)>;
 
-    // メンバイニシャライザで初期化をしていないのはどう書いても読みにくいから
-    evaluator()
-    {
-      (*this)["quote"] = [](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        return std::size(expr) < 2 ? scope["nil"] : expr[1];
-      };
-
-      (*this)["cond"] = [&](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        while (std::size(expr) < 4)
-        {
-          expr.emplace_back();
-        }
-        return (*this)((*this)(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
-      };
-
-      (*this)["define"] = [&](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        while (std::size(expr) < 3)
-        {
-          expr.emplace_back();
-        }
-        return scope[expr[1].value] = (*this)(expr[2], scope);
-      };
-
-      (*this)["lambda"] = [](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        expr.closure = scope;
-        return expr;
-      };
-    }
-
     cell& operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       cell expr {s};
@@ -397,6 +362,41 @@ namespace lisp
 
     std::exit(boost::exit_failure);
   }
+
+
+  template <template <typename...> typename BinaryOperaor, typename T>
+  class numeric_procedure
+  {
+  public:
+    template <typename... Ts>
+    using binary_operator = BinaryOperaor<Ts...>;
+
+    using value_type = T;
+
+    cell& operator()(cell& expr, cell::scope_type& scope) try
+    {
+      std::vector<value_type> buffer {};
+
+      for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+      {
+        *iter = evaluate(*iter, scope);
+        // buffer.push_back(boost::lexical_cast<value_type>(*iter));
+        buffer.emplace_back(iter->value);
+      }
+
+      const auto result {std::accumulate(
+        std::begin(buffer) + 1, std::end(buffer), buffer.front(), binary_operator<value_type> {}
+      )};
+
+      // return expr = {cell::type::atom, boost::lexical_cast<std::string>(result)};
+      return expr = {cell::type::atom, result.str()};
+    }
+    catch (std::exception& exception)
+    {
+      std::cerr << "(error " << expr << " \"" << exception.what() << "\")" << std::endl;
+      return expr = scope["nil"];
+    }
+  };
 } // namespace lisp
 
 
@@ -405,6 +405,49 @@ int main(int argc, char** argv)
   const std::vector<std::string> args {argv + 1, argv + argc};
 
   // lisp::cell::scope_type scope {};
+
+  {
+    using namespace lisp;
+    using namespace boost::multiprecision;
+
+    evaluate["quote"] = [](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      return std::size(expr) < 2 ? scope["nil"] : expr[1];
+    };
+
+    evaluate["cond"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      while (std::size(expr) < 4)
+      {
+        expr.emplace_back();
+      }
+      return evaluate(evaluate(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
+    };
+
+    evaluate["define"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      while (std::size(expr) < 3)
+      {
+        expr.emplace_back();
+      }
+      return scope[expr[1].value] = evaluate(expr[2], scope);
+    };
+
+    evaluate["lambda"] = [](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      expr.closure = scope;
+      return expr;
+    };
+
+    evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
+    evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
+    evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
+    evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
+  }
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
