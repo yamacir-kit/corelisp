@@ -4,6 +4,7 @@
 #include <map>
 #include <numeric>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -11,10 +12,21 @@
 
 namespace lisp
 {
+  // トークナイザを関数オブジェクトにした理由は正直、特に無い
   class tokenizer
     : public std::vector<std::string> // 多分ベクタじゃない方が効率が良い
   {
   public:
+    // 関数として事前に実体化しておくオブジェクト`tokenize`のために用意
+    tokenizer() = default;
+
+    // `cell`型を文字列から構築する際に暗黙に呼んでもらうために用意
+    template <typename... Ts>
+    tokenizer(Ts&&... args)
+    {
+      operator()(std::forward<Ts>(args)...);
+    }
+
     auto& operator()(const std::string& s)
     {
       if (!std::empty(*this)) // この条件要らない説
@@ -70,6 +82,7 @@ namespace lisp
     }
   } tokenize;
 
+
   class cell
     : public std::vector<cell>
   {
@@ -86,6 +99,7 @@ namespace lisp
       : state {state}, value {value}
     {}
 
+    // Universal Reference が使いたかったからテンプレートになっているが、危険なので要修正
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
       : state {type::list}
@@ -106,7 +120,16 @@ namespace lisp
       }
     }
 
-  public:
+    // 文字列を明示的にトークナイズしてASTを構築するときのためコンストラクタ。
+    explicit cell(const tokenizer& tokens)
+      : cell {std::begin(tokens), std::end(tokens)}
+    {}
+
+    // 文字列から暗黙に構築したトークン列を経由してASTを構築するときのためのコンストラクタ。
+    cell(tokenizer&& tokens)
+      : cell {std::begin(tokens), std::end(tokens)}
+    {}
+
     friend auto operator<<(std::ostream& ostream, const cell& expr)
       -> std::ostream&
     {
@@ -127,7 +150,7 @@ namespace lisp
   };
 
 
-  auto tokenize_(const std::string& code)
+  [[deprecated]] auto tokenize_(const std::string& code)
   {
     std::vector<std::string> tokens {};
 
@@ -262,10 +285,7 @@ int main(int argc, char** argv)
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    // const auto tokens {lisp::tokenize(buffer)};
-    // std::cout << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
-
-    std::cout << lisp::tokenize(buffer) << std::endl;
+    std::cout << lisp::evaluate(lisp::cell {buffer}, scope) << std::endl;
   }
 
   return boost::exit_success;
