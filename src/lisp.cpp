@@ -25,6 +25,27 @@ namespace lisp
     {
       return c == '(' || c == ')';
     }
+
+  protected:
+    template <typename InputIterator>
+    static constexpr auto find_token_begin(InputIterator first, InputIterator last)
+      -> InputIterator
+    {
+      return std::find_if(first, last, [](auto c)
+             {
+               return std::isgraph(c);
+             });
+    }
+
+    template <typename InputIterator>
+    static constexpr auto find_token_end(InputIterator first, InputIterator last)
+      -> InputIterator
+    {
+      return std::find_if(first, last, [](auto c)
+             {
+               return is_round_brackets(c) || std::isspace(c);
+             });
+    }
   };
 
   class cell
