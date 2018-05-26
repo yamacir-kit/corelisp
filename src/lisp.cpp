@@ -12,18 +12,40 @@
 namespace lisp
 {
   class tokenizer
-    : public std::vector<std::string>
+    : public std::vector<std::string> // 多分ベクタじゃない方が効率が良い
   {
   public:
     auto& operator()(const std::string& s)
     {
+      if (!std::empty(*this)) // この条件要らない説
+      {
+        clear();
+      }
+
+      // メンバ関数名が長いせいで読みにくいのが気に入らない
+      for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
+      {
+        emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
+        iter += std::size(back()); // この行を上手いこと上の行の処理に組み込みたい
+      }
+
       return *this;
     }
 
     template <typename T>
-    static constexpr bool is_round_brackets(T&& c)
+    static constexpr bool is_round_brackets(T&& c) // `std::isparen`があれば
     {
       return c == '(' || c == ')';
+    }
+
+    // デバッグ用のストリーム出力演算子オーバーロード
+    friend std::ostream& operator<<(std::ostream& os, tokenizer& tokens)
+    {
+      for (const auto& each : tokens)
+      {
+        os << each << (&each != &tokens.back() ? ", " : "");
+      }
+      return os;
     }
 
   protected:
@@ -46,7 +68,7 @@ namespace lisp
                return is_round_brackets(c) || std::isspace(c);
              });
     }
-  };
+  } tokenize;
 
   class cell
     : public std::vector<cell>
@@ -105,7 +127,7 @@ namespace lisp
   };
 
 
-  auto tokenize(const std::string& code)
+  auto tokenize_(const std::string& code)
   {
     std::vector<std::string> tokens {};
 
@@ -240,8 +262,10 @@ int main(int argc, char** argv)
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    const auto tokens {lisp::tokenize(buffer)};
-    std::cout << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
+    // const auto tokens {lisp::tokenize(buffer)};
+    // std::cout << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
+
+    std::cout << lisp::tokenize(buffer) << std::endl;
   }
 
   return boost::exit_success;
