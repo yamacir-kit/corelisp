@@ -4,6 +4,7 @@
 #include <map>
 #include <numeric>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -11,6 +12,77 @@
 
 namespace lisp
 {
+  // トークナイザを関数オブジェクトにした理由は正直、特に無い
+  class tokenizer
+    : public std::vector<std::string> // 多分ベクタじゃない方が効率が良い
+  {
+  public:
+    // 関数として事前に実体化しておくオブジェクト`tokenize`のために用意
+    tokenizer() = default;
+
+    // `cell`型を文字列から構築する際に暗黙に呼んでもらうために用意
+    template <typename... Ts>
+    tokenizer(Ts&&... args)
+    {
+      operator()(std::forward<Ts>(args)...);
+    }
+
+    auto& operator()(const std::string& s)
+    {
+      if (!std::empty(*this)) // この条件要らない説
+      {
+        clear();
+      }
+
+      // メンバ関数名が長いせいで読みにくいのが気に入らない
+      for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
+      {
+        emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
+        iter += std::size(back()); // この行を上手いこと上の行の処理に組み込みたい
+      }
+
+      return *this;
+    }
+
+    template <typename T>
+    static constexpr bool is_round_brackets(T&& c) // `std::isparen`があれば
+    {
+      return c == '(' || c == ')';
+    }
+
+    // デバッグ用のストリーム出力演算子オーバーロード
+    friend std::ostream& operator<<(std::ostream& os, tokenizer& tokens)
+    {
+      for (const auto& each : tokens)
+      {
+        os << each << (&each != &tokens.back() ? ", " : "");
+      }
+      return os;
+    }
+
+  protected:
+    template <typename InputIterator>
+    static constexpr auto find_token_begin(InputIterator first, InputIterator last)
+      -> InputIterator
+    {
+      return std::find_if(first, last, [](auto c)
+             {
+               return std::isgraph(c);
+             });
+    }
+
+    template <typename InputIterator>
+    static constexpr auto find_token_end(InputIterator first, InputIterator last)
+      -> InputIterator
+    {
+      return std::find_if(first, last, [](auto c)
+             {
+               return is_round_brackets(c) || std::isspace(c);
+             });
+    }
+  } tokenize;
+
+
   class cell
     : public std::vector<cell>
   {
@@ -27,6 +99,7 @@ namespace lisp
       : state {state}, value {value}
     {}
 
+    // Universal Reference が使いたかったからテンプレートになっているが、危険なので要修正
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
       : state {type::list}
@@ -47,7 +120,16 @@ namespace lisp
       }
     }
 
-  public:
+    // 文字列を明示的にトークナイズしてASTを構築するときのためコンストラクタ。
+    explicit cell(const tokenizer& tokens)
+      : cell {std::begin(tokens), std::end(tokens)}
+    {}
+
+    // 文字列から暗黙に構築したトークン列を経由してASTを構築するときのためのコンストラクタ。
+    cell(tokenizer&& tokens)
+      : cell {std::begin(tokens), std::end(tokens)}
+    {}
+
     friend auto operator<<(std::ostream& ostream, const cell& expr)
       -> std::ostream&
     {
@@ -68,7 +150,7 @@ namespace lisp
   };
 
 
-  auto tokenize(const std::string& code)
+  [[deprecated]] auto tokenize_(const std::string& code)
   {
     std::vector<std::string> tokens {};
 
@@ -203,8 +285,7 @@ int main(int argc, char** argv)
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    const auto tokens {lisp::tokenize(buffer)};
-    std::cout << lisp::evaluate(lisp::cell {std::begin(tokens), std::end(tokens)}, scope) << std::endl;
+    std::cout << lisp::evaluate(lisp::cell {buffer}, scope) << std::endl;
   }
 
   return boost::exit_success;
