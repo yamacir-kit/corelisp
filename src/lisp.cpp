@@ -9,10 +9,6 @@
 #include <boost/cstdlib.hpp>
 
 
-#define debug(...) std::cerr << "(\e[32mdebug \e[31m" << expr << " \e[36m" << __LINE__ << "\e[0m) -> ";
-#define error(...) std::cerr << "(\e[32merror \e[31m" << expr << " \e[36m" << __LINE__ << "\e[0m)" << std::endl; std::exit(boost::exit_failure);
-
-
 namespace lisp
 {
   class cell
@@ -193,7 +189,6 @@ namespace lisp
       }
     }
 
-    std::cerr << "(error \e[31m" << expr << "\e[0m)" << std::endl;
     std::exit(boost::exit_failure);
   }
 } // namespace lisp
