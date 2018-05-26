@@ -9,7 +9,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -381,18 +380,45 @@ int main(int argc, char** argv)
   }
 
   {
-    const std::vector<std::string> prelude
+    const std::vector<std::pair<std::string, std::string>> prelude
     {
-      "(define cons (lambda (a d) (lambda (f) (f a d))))",
+      {"(quote a)", "a"},
+      {"(quote (a b c))", "(a b c)"},
 
-      "(define car (lambda (ad) (ad (lambda (a d) a))))",
-      "(define cdr (lambda (ad) (ad (lambda (a d) d))))",
+      {"(atom (quote a))", "true"},
+      {"(atom (quote (a b c))", "()"},
+      {"(atom (quote ()))", "true"},
+      {"(atom (atom (quote a)))", "true"},
+      {"(atom (quote (atom (quote a))))", "()"},
+
+      {"(eq (quote a) (quote a))", "true"},
+      {"(eq (quote a) (quote b))", "()"},
+      {"(eq (quote ()) (quote ()))", "true"},
+
+      {"(define car (lambda (ad) (ad (lambda (a d) a))))", "(lambda (ad) (ad (lambda (a d) a)))"},
+      {"(car (quote (a b c)))", "a"},
+
+
+      {"(define cdr (lambda (ad) (ad (lambda (a d) d))))", "(lambda (ad) (ad (lambda (a d) d)))"},
+      {"(cdr (quote (a b c)))", "(b c)"},
+
+      {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
+      {"(cons (quote a) (quote (b c)))", "(a b c)"},
+      {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
+      {"(car (cons (quote a) (quote (b c))))", "a"},
+      {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
+
+      {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
     };
 
     for (auto iter {std::begin(prelude)}; iter != std::end(prelude); ++iter)
     {
-      std::cerr << "prelude[" << std::distance(std::begin(prelude), iter) << "]< " << *iter << std::endl;
-      std::cerr << lisp::evaluate(*iter) << "\n\n";
+      std::cerr << "prelude[" << std::distance(std::begin(prelude), iter) << "]< " << (*iter).first << std::endl;
+
+      std::stringstream buffer {};
+      buffer << lisp::evaluate((*iter).first);
+
+      std::cerr << buffer.str() << " -> \e[33m(selfcheck " << (buffer.str() != (*iter).second ? "failed" : "passed") << ")\e[0m\n\n";
     }
   }
 
