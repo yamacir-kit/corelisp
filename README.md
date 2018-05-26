@@ -1,6 +1,6 @@
 # Pure LISP interpreter by C++17
 
-Version 0.1.14 in development.
+Version 0.1.25 in development.
 
 ## Overview
 
@@ -14,7 +14,6 @@ To do description.
 ## Build
 
 ``` sh
-mkdir -p build && cd build
-make
+mkdir -p build && cd build && make
 ```
 
