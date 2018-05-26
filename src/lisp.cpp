@@ -196,43 +196,6 @@ namespace lisp
   public:
     using signature = std::function<cell& (cell&, cell::scope_type&)>;
 
-    // メンバイニシャライザで初期化をしていないのはどう書いても読みにくいから
-    evaluator()
-    {
-      (*this)["quote"] = [](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        return std::size(expr) < 2 ? scope["nil"] : expr[1];
-      };
-
-      (*this)["cond"] = [&](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        while (std::size(expr) < 4)
-        {
-          expr.emplace_back();
-        }
-        return (*this)((*this)(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
-      };
-
-      (*this)["define"] = [&](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        while (std::size(expr) < 3)
-        {
-          expr.emplace_back();
-        }
-        return scope[expr[1].value] = (*this)(expr[2], scope);
-      };
-
-      (*this)["lambda"] = [](auto& expr, auto& scope)
-        -> decltype(auto)
-      {
-        expr.closure = scope;
-        return expr;
-      };
-    }
-
     cell& operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       cell expr {s};
@@ -446,6 +409,39 @@ int main(int argc, char** argv)
   {
     using namespace lisp;
     using namespace boost::multiprecision;
+
+    evaluate["quote"] = [](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      return std::size(expr) < 2 ? scope["nil"] : expr[1];
+    };
+
+    evaluate["cond"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      while (std::size(expr) < 4)
+      {
+        expr.emplace_back();
+      }
+      return evaluate(evaluate(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
+    };
+
+    evaluate["define"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      while (std::size(expr) < 3)
+      {
+        expr.emplace_back();
+      }
+      return scope[expr[1].value] = evaluate(expr[2], scope);
+    };
+
+    evaluate["lambda"] = [](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      expr.closure = scope;
+      return expr;
+    };
 
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
     evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
