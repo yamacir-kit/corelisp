@@ -14,7 +14,6 @@ To do description.
 ## Build
 
 ``` sh
-mkdir -p build && cd build
-make
+mkdir -p build && cd build && make
 ```
 
