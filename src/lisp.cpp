@@ -192,6 +192,45 @@ namespace lisp
     static inline cell::scope_type dynamic_scope {};
 
   public:
+    using signature = std::function<cell& (cell&, cell::scope_type&)>;
+
+    // メンバイニシャライザで初期化をしていないのはどう書いても読みにくいから
+    evaluator()
+    {
+      (*this)["quote"] = [](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        return std::size(expr) < 2 ? scope["nil"] : expr[1];
+      };
+
+      (*this)["cond"] = [&](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        while (std::size(expr) < 4)
+        {
+          expr.emplace_back();
+        }
+        return (*this)((*this)(expr[1], scope).value != "nil" ? expr[2] : expr[3], scope);
+      };
+
+      (*this)["define"] = [&](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        while (std::size(expr) < 3)
+        {
+          expr.emplace_back();
+        }
+        return scope[expr[1].value] = (*this)(expr[2], scope);
+      };
+
+      (*this)["lambda"] = [](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        expr.closure = scope;
+        return expr;
+      };
+    }
+
     cell& operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       cell expr {s};
