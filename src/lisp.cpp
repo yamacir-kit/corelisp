@@ -377,9 +377,10 @@ int main(int argc, char** argv)
       {
         highwrite(expr[1]);
         const auto buffer {evaluate(expr[1], scope)};
+        expr[1] = std::move(buffer);
 
         highwrite(expr[1]);
-        return (buffer.state != cell::type::atom && std::size(buffer) != 0) ? scope["nil"] : scope["true"];
+        return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
       }
     };
 
