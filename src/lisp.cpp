@@ -16,6 +16,9 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 
+#define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+
+
 namespace lisp
 {
   class tokenizer
@@ -151,7 +154,7 @@ namespace lisp
     {
       std::stringstream sstream {}, pattern {};
       sstream << *this;
-      pattern << "^(.*)(" << escape_regex_specials(target) << ")(.*)$";
+      pattern << "^(.*?[\\s|\\(]?)(" << escape_regex_specials(target) << ")([\\s|\\)].*)$";
       return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
     }
 
@@ -224,11 +227,11 @@ namespace lisp
 
         if ((*this).find(expr[0].value) != std::end(*this))
         {
-          std::cerr << expr.highlight(expr[0]) << std::endl;
+          highwrite(expr[0]);
           return (*this).at(expr[0].value)(expr, scope);
         }
 
-        std::cerr << expr.highlight(expr[0]) << std::endl;
+        highwrite(expr[0]);
         switch (expr[0] = (*this)(expr[0], scope); expr[0].state)
         {
         case cell::type::list:
@@ -242,11 +245,11 @@ namespace lisp
 
             for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
             {
-              std::cerr << expr.highlight(expr[index + 1]) << std::endl;
+              highwrite(expr[index + 1]);
               expr.closure[expr[0][1][index].value] = (*this)(expr[index + 1], scope);
             }
 
-            std::cerr << expr.highlight(expr[0][2]) << std::endl;
+            highwrite(expr[0][2]);
             return (*this)(expr[0][2], expr.closure);
           }
           else
@@ -258,7 +261,7 @@ namespace lisp
         case cell::type::atom:
           if ((*this).find(expr[0].value) != std::end(*this))
           {
-            std::cerr << expr.highlight(expr[0]) << std::endl;
+            highwrite(expr[0]);
             return (*this).at(expr[0].value)(expr, scope);
           }
           else
@@ -291,7 +294,7 @@ namespace lisp
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
         std::cerr << expr.highlight(*iter) << std::endl;
-        *iter = evaluate(*iter, scope);
+        *iter = evaluate(*iter, scope); // XXX DANGER?
         buffer.emplace_back(iter->value);
       }
 
@@ -321,7 +324,7 @@ int main(int argc, char** argv)
     evaluate["quote"] = [](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      return std::size(expr) < 2 ? scope["nil"] : expr[1];
+      return std::size(expr) < 2 ? scope["nil"] : (highwrite(expr[1]), expr[1]);
     };
 
     evaluate["cond"] = [&](auto& expr, auto& scope)
@@ -372,11 +375,11 @@ int main(int argc, char** argv)
       }
       else
       {
-        std::cerr << expr.highlight(expr[1]) << std::endl;
-        expr[1] = evaluate(expr[1], scope);
-        // std::cerr << expr.highlight(expr[1]) << std::endl;
+        highwrite(expr[1]);
+        const auto buffer {evaluate(expr[1], scope)};
 
-        return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
+        highwrite(expr[1]);
+        return (buffer.state != cell::type::atom && std::size(buffer) != 0) ? scope["nil"] : scope["true"];
       }
     };
 
