@@ -207,7 +207,9 @@ namespace lisp
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type dynamic_scope {};
+    static inline cell::scope_type dynamic_scope {
+      {"true", cell {cell::type::atom, "true"}}
+    };
 
   public:
     using signature = std::function<cell& (cell&, cell::scope_type&)>;
@@ -258,17 +260,19 @@ namespace lisp
             std::cerr << expr.highlight(expr[0][2]) << std::endl;
             return (*this)(expr[0][2], expr.closure);
           }
-          else // ここに来るということは多分ラムダのタイポか何か。
-          {
-            std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
-            return scope["nil"];
-          }
+          // else // ここに来るということは多分ラムダのタイポか何か。
+          // {
+          //   std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
+          //   return scope["nil"];
+          // }
+          [[fallthrough]];
 
         case cell::type::atom:
           // 特殊形式および組み込みプロシージャの探索と評価。
           if ((*this).find(expr[0].value) != std::end(*this))
           {
             // 引数をどのように評価するかは形式毎に異なるため、評価前の式を渡す。
+            std::cerr << expr.highlight(expr) << std::endl;
             return (*this).at(expr[0].value)(expr, scope);
           }
           else
@@ -331,7 +335,14 @@ int main(int argc, char** argv)
     evaluate["quote"] = [](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      return std::size(expr) < 2 ? scope["nil"] : expr[1];
+      if (std::size(expr) < 2)
+      {
+        return scope["nil"];
+      }
+      else
+      {
+        return expr[1];
+      }
     };
 
     evaluate["cond"] = [&](auto& expr, auto& scope)
@@ -373,6 +384,23 @@ int main(int argc, char** argv)
       return expr;
     };
 
+    evaluate["atom"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      if (std::size(expr) < 2)
+      {
+        return scope["nil"];
+      }
+      else
+      {
+        std::cerr << expr.highlight(expr[1]) << std::endl;
+        expr[1] = evaluate(expr[1], scope);
+        std::cerr << expr.highlight(expr[1]) << std::endl;
+
+        return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
+      }
+    };
+
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
     evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
     evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
@@ -402,13 +430,13 @@ int main(int argc, char** argv)
       {"(define cdr (lambda (ad) (ad (lambda (a d) d))))", "(lambda (ad) (ad (lambda (a d) d)))"},
       {"(cdr (quote (a b c)))", "(b c)"},
 
-      {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
-      {"(cons (quote a) (quote (b c)))", "(a b c)"},
-      {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
-      {"(car (cons (quote a) (quote (b c))))", "a"},
-      {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
+      // {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
+      // {"(cons (quote a) (quote (b c)))", "(a b c)"},
+      // {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
+      // {"(car (cons (quote a) (quote (b c))))", "a"},
+      // {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
 
-      {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
+      // {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
     };
 
     for (auto iter {std::begin(prelude)}; iter != std::end(prelude); ++iter)
@@ -419,6 +447,8 @@ int main(int argc, char** argv)
       buffer << lisp::evaluate((*iter).first);
 
       std::cerr << buffer.str() << " -> \e[33m(selfcheck " << (buffer.str() != (*iter).second ? "failed" : "passed") << ")\e[0m\n\n";
+
+      // std::cerr << lisp::evaluate((*iter).first) << " / " << (*iter).second << "\n\n";
     }
   }
 
