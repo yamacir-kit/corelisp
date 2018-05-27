@@ -234,6 +234,13 @@ namespace lisp
           return expr = {cell::type::atom, "nil"};
         }
 
+        if ((*this).find(expr[0].value) != std::end(*this))
+        {
+          // 引数をどのように評価するかは形式毎に異なるため、評価前の式を渡す。
+          std::cerr << expr.highlight(expr[0]) << std::endl;
+          return (*this).at(expr[0].value)(expr, scope);
+        }
+
         // ラムダか組み込みプロシージャの別名である可能性しか残ってないので、一先ずCAR部分を評価にかける。
         // 既知のシンボルであった場合はバインドされた式が返ってくる。
         // 未知のシンボルであった場合はシンボル名がオウム返しされてくる。
@@ -241,7 +248,7 @@ namespace lisp
         switch (expr[0] = (*this)(expr[0], scope); expr[0].state)
         {
         case cell::type::list:
-          if (expr[0][0].value == "lambda") // TODO この条件式要らない説
+          if (expr[0][0].value == "lambda")
           {
             if (std::size(expr[0][1]) != std::size(expr) - 1)
             {
@@ -272,7 +279,7 @@ namespace lisp
           if ((*this).find(expr[0].value) != std::end(*this))
           {
             // 引数をどのように評価するかは形式毎に異なるため、評価前の式を渡す。
-            std::cerr << expr.highlight(expr) << std::endl;
+            std::cerr << expr.highlight(expr[0]) << std::endl;
             return (*this).at(expr[0].value)(expr, scope);
           }
           else
@@ -395,7 +402,7 @@ int main(int argc, char** argv)
       {
         std::cerr << expr.highlight(expr[1]) << std::endl;
         expr[1] = evaluate(expr[1], scope);
-        std::cerr << expr.highlight(expr[1]) << std::endl;
+        // std::cerr << expr.highlight(expr[1]) << std::endl;
 
         return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
       }
