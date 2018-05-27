@@ -16,47 +16,45 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 
+#define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+
+
 namespace lisp
 {
-  // トークナイザを関数オブジェクトにした理由は正直、特に無い
   class tokenizer
-    : public std::vector<std::string> // 多分ベクタじゃない方が効率が良い
+    : public std::vector<std::string>
   {
   public:
-    // 関数として事前に実体化しておくオブジェクト`tokenize`のために用意
     tokenizer() = default;
 
-    // `cell`型を文字列から構築する際に暗黙に呼んでもらうために用意
     template <typename... Ts>
     tokenizer(Ts&&... args)
     {
-      operator()(std::forward<Ts>(args)...);
+      (*this).operator()(std::forward<Ts>(args)...);
     }
 
     auto& operator()(const std::string& s)
     {
-      if (!std::empty(*this)) // この条件要らない説
+      if (!std::empty(*this))
       {
         clear();
       }
 
-      // メンバ関数名が長いせいで読みにくいのが気に入らない
       for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
       {
         emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
-        iter += std::size(back()); // この行を上手いこと上の行の処理に組み込みたい
+        iter += std::size(back());
       }
 
       return *this;
     }
 
     template <typename T>
-    static constexpr bool is_round_brackets(T&& c) // `std::isparen`があれば
+    static constexpr bool is_round_brackets(T&& c)
     {
       return c == '(' || c == ')';
     }
 
-    // デバッグ用のストリーム出力演算子オーバーロード
     friend auto operator<<(std::ostream& os, tokenizer& tokens)
       -> std::ostream&
     {
@@ -106,13 +104,11 @@ namespace lisp
       : state {state}, value {value}
     {}
 
-    // トップレベルは右辺値参照でイテレータを受けることになるが、
-    // 再帰呼出しの過程でイテレータを左辺値参照で渡していく必要があるため
     template <typename InputIterator>
     cell(InputIterator&& first, InputIterator&& last)
       : state {type::list}
     {
-      if (std::distance(first, last) != 0) // サイズゼロのリストはNIL
+      if (std::distance(first, last) != 0)
       {
         if (*first == "(")
         {
@@ -128,12 +124,10 @@ namespace lisp
       }
     }
 
-    // 文字列を明示的にトークナイズしてASTを構築するときのためコンストラクタ。
     explicit cell(const tokenizer& tokens)
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
-    // 文字列から暗黙に構築したトークン列を経由してASTを構築するときのためのコンストラクタ。
     cell(tokenizer&& tokens)
       : cell {std::begin(tokens), std::end(tokens)}
     {}
@@ -156,13 +150,11 @@ namespace lisp
       }
     }
 
-    // デバッグ用のシンタックスハイライタ
-    // 指定された文字列部分を強調表示するエスケープシーケンスを混ぜ込んだセルの文字列を返す
     auto highlight(const std::string& target)
     {
       std::stringstream sstream {}, pattern {};
       sstream << *this;
-      pattern << "^(.*)(" << escape_regex_specials(target) << ")(.*)$";
+      pattern << "^(.*?[\\s|\\(]?)(" << escape_regex_specials(target) << ")([\\s|\\)].*)$";
       return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
     }
 
@@ -207,7 +199,9 @@ namespace lisp
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type dynamic_scope {};
+    static inline cell::scope_type dynamic_scope {
+      {"true", cell {cell::type::atom, "true"}}
+    };
 
   public:
     using signature = std::function<cell& (cell&, cell::scope_type&)>;
@@ -226,20 +220,22 @@ namespace lisp
         return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
       case cell::type::list:
-        // 空のリストはNILに評価される。
         if (std::empty(expr))
         {
-          return expr = {cell::type::atom, "nil"};
+          return expr = {};
         }
 
-        // ラムダか組み込みプロシージャの別名である可能性しか残ってないので、一先ずCAR部分を評価にかける。
-        // 既知のシンボルであった場合はバインドされた式が返ってくる。
-        // 未知のシンボルであった場合はシンボル名がオウム返しされてくる。
-        std::cerr << expr.highlight(expr[0]) << std::endl;
+        if ((*this).find(expr[0].value) != std::end(*this))
+        {
+          highwrite(expr[0]);
+          return (*this).at(expr[0].value)(expr, scope);
+        }
+
+        highwrite(expr[0]);
         switch (expr[0] = (*this)(expr[0], scope); expr[0].state)
         {
         case cell::type::list:
-          if (expr[0][0].value == "lambda") // TODO この条件式要らない説
+          if (expr[0][0].value == "lambda")
           {
             if (std::size(expr[0][1]) != std::size(expr) - 1)
             {
@@ -247,28 +243,25 @@ namespace lisp
               return scope["nil"];
             }
 
-            // クロージャ（ラムダ定義時のスコープ）へ仮引数名をキーに実引数を評価して格納する。
             for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
             {
-              std::cerr << expr.highlight(expr[index + 1]) << std::endl;
+              highwrite(expr[index + 1]);
               expr.closure[expr[0][1][index].value] = (*this)(expr[index + 1], scope);
             }
 
-            // ラムダ本体の部分を評価する。仮引数名と評価済み実引数の対応はクロージャが知っている。
-            std::cerr << expr.highlight(expr[0][2]) << std::endl;
+            highwrite(expr[0][2]);
             return (*this)(expr[0][2], expr.closure);
           }
-          else // ここに来るということは多分ラムダのタイポか何か。
+          else
           {
             std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
             return scope["nil"];
           }
 
         case cell::type::atom:
-          // 特殊形式および組み込みプロシージャの探索と評価。
           if ((*this).find(expr[0].value) != std::end(*this))
           {
-            // 引数をどのように評価するかは形式毎に異なるため、評価前の式を渡す。
+            highwrite(expr[0]);
             return (*this).at(expr[0].value)(expr, scope);
           }
           else
@@ -301,7 +294,7 @@ namespace lisp
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
         std::cerr << expr.highlight(*iter) << std::endl;
-        *iter = evaluate(*iter, scope);
+        *iter = evaluate(*iter, scope); // XXX DANGER?
         buffer.emplace_back(iter->value);
       }
 
@@ -331,7 +324,7 @@ int main(int argc, char** argv)
     evaluate["quote"] = [](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      return std::size(expr) < 2 ? scope["nil"] : expr[1];
+      return std::size(expr) < 2 ? scope["nil"] : (highwrite(expr[1]), expr[1]);
     };
 
     evaluate["cond"] = [&](auto& expr, auto& scope)
@@ -373,6 +366,24 @@ int main(int argc, char** argv)
       return expr;
     };
 
+    evaluate["atom"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      if (std::size(expr) < 2)
+      {
+        return scope["nil"];
+      }
+      else
+      {
+        highwrite(expr[1]);
+        const auto buffer {evaluate(expr[1], scope)};
+        expr[1] = std::move(buffer);
+
+        highwrite(expr[1]);
+        return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
+      }
+    };
+
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
     evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
     evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
@@ -402,13 +413,13 @@ int main(int argc, char** argv)
       {"(define cdr (lambda (ad) (ad (lambda (a d) d))))", "(lambda (ad) (ad (lambda (a d) d)))"},
       {"(cdr (quote (a b c)))", "(b c)"},
 
-      {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
-      {"(cons (quote a) (quote (b c)))", "(a b c)"},
-      {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
-      {"(car (cons (quote a) (quote (b c))))", "a"},
-      {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
+      // {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
+      // {"(cons (quote a) (quote (b c)))", "(a b c)"},
+      // {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
+      // {"(car (cons (quote a) (quote (b c))))", "a"},
+      // {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
 
-      {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
+      // {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
     };
 
     for (auto iter {std::begin(prelude)}; iter != std::end(prelude); ++iter)
