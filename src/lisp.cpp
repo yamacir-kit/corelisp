@@ -132,6 +132,39 @@ namespace lisp
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
+    bool operator!=(const cell& rhs)
+    {
+      if ((*this).state != rhs.state)
+      {
+        return true;
+      }
+
+      if ((*this).value != rhs.value)
+      {
+        return true;
+      }
+
+      if (std::size(*this) != std::size(rhs))
+      {
+        return true;
+      }
+
+      for (std::size_t index {0}; index < std::size(*this); ++index)
+      {
+        if ((*this)[index] != rhs[index])
+        {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    bool operator==(const cell& rhs)
+    {
+      return !((*this) != rhs);
+    }
+
     friend auto operator<<(std::ostream& ostream, const cell& expr)
       -> std::ostream&
     {
@@ -228,11 +261,12 @@ namespace lisp
         if ((*this).find(expr[0].value) != std::end(*this))
         {
           highwrite(expr[0]);
-          return (*this).at(expr[0].value)(expr, scope);
+          const auto buffer {(*this).at(expr[0].value)(expr, scope)};
+          return expr = std::move(buffer);
         }
 
         highwrite(expr[0]);
-        switch (expr[0] = (*this)(expr[0], scope); expr[0].state)
+        switch (const auto buffer {(*this)(expr[0], scope)}; (expr[0] = std::move(buffer)).state)
         {
         case cell::type::list:
           if (expr[0][0].value == "lambda")
@@ -381,6 +415,19 @@ int main(int argc, char** argv)
 
         highwrite(expr[1]);
         return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
+      }
+    };
+
+    evaluate["eq"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      if (std::size(expr) < 3)
+      {
+        return scope["nil"];
+      }
+      else
+      {
+        return expr[1] != expr[2] ? scope["nil"] : scope["true"];
       }
     };
 
