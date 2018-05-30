@@ -1,10 +1,10 @@
-#include <algorithm> // std::find_if
-#include <functional> // std::function, std::plus, std::minus, std::multiplies, std::divides
+#include <algorithm>
+#include <functional>
 #include <iostream>
-#include <iterator> // std::begin, std::end, std::size, std::empty, std::distance
-#include <locale> // std::isgraph, std::isspace
+#include <iterator>
+#include <locale>
 #include <map>
-#include <numeric> // std::accumulate
+#include <numeric>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -351,145 +351,101 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
+  using namespace lisp;
+  using namespace boost::multiprecision;
+
+  evaluate["quote"] = [](auto& expr, auto&)
+    -> decltype(auto)
   {
-    using namespace lisp;
-    using namespace boost::multiprecision;
+    return highwrite(expr.at(1)), expr.at(1);
+  };
 
-    evaluate["quote"] = [](auto& expr, auto&)
-      -> decltype(auto)
-    {
-      return highwrite(expr.at(1)), expr.at(1);
-    };
-
-    evaluate["cond"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      highwrite(expr.at(1));
-      return evaluate(
-               evaluate(expr.at(1), scope).value != "nil"
-                 ? (highwrite(expr.at(2)), expr.at(2))
-                 : (highwrite(expr.at(3)), expr.at(3)),
-               scope
-             );
-    };
-
-    evaluate["define"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      highwrite(expr.at(2));
-      return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
-    };
-
-    evaluate["lambda"] = [](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      expr.closure = scope;
-
-      for (const auto& each : expr.closure)
-      {
-        std::cerr << "  \e[32m[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
-      }
-
-      return expr;
-    };
-
-    evaluate["atom"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      highwrite(expr.at(1));
-      const auto buffer {evaluate(expr.at(1), scope)};
-      expr[1] = std::move(buffer);
-
-      return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
-    };
-
-    evaluate["eq"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
-    };
-
-    evaluate["cons"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      cell buffer {};
-
-      highwrite(expr.at(1));
-      buffer.push_back(evaluate(expr.at(1), scope));
-
-      highwrite(expr.at(2));
-      for (const auto& each : evaluate(expr.at(2), scope))
-      {
-        buffer.push_back(each);
-      }
-
-      return expr = std::move(buffer);
-    };
-
-    evaluate["car"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      highwrite(expr.at(1));
-      const auto buffer {evaluate(expr.at(1), scope).at(0)};
-      return expr = std::move(buffer);
-    };
-
-    evaluate["cdr"] = [&](auto& expr, auto& scope)
-      -> decltype(auto)
-    {
-      highwrite(expr.at(1));
-      auto buffer {evaluate(expr.at(1), scope)};
-      buffer.erase(std::begin(buffer));
-      return expr = std::move(buffer);
-    };
-
-    evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
-    evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
-    evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
-    evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
-  }
-
+  evaluate["cond"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
   {
-    const std::vector<std::pair<std::string, std::string>> prelude
+    highwrite(expr.at(1));
+    return evaluate(
+             evaluate(expr.at(1), scope).value != "nil"
+               ? (highwrite(expr.at(2)), expr.at(2))
+               : (highwrite(expr.at(3)), expr.at(3)),
+             scope
+           );
+  };
+
+  evaluate["define"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    highwrite(expr.at(2));
+    return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
+  };
+
+  evaluate["lambda"] = [](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    expr.closure = scope;
+
+    for (const auto& each : expr.closure)
     {
-      {"(quote a)", "a"},
-      {"(quote (a b c))", "(a b c)"},
-
-      {"(atom (quote a))", "true"},
-      {"(atom (quote (a b c))", "()"},
-      {"(atom (quote ()))", "true"},
-      {"(atom (atom (quote a)))", "true"},
-      {"(atom (quote (atom (quote a))))", "()"},
-
-      {"(eq (quote a) (quote a))", "true"},
-      {"(eq (quote a) (quote b))", "()"},
-      {"(eq (quote ()) (quote ()))", "true"},
-
-      // {"(define car (lambda (e) ((lambda (a d) a) e)))", "(lambda (e) ((lambda (a d) a) e))"},
-      {"(car (quote (a b c)))", "a"},
-
-      // {"(define cdr (lambda (e) ((lambda (a d) d) e)))", "(lambda (e) ((lambda (a d) d) e))"},
-      {"(cdr (quote (a b c)))", "(b c)"},
-
-      // {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
-      {"(cons (quote a) (quote (b c)))", "(a b c)"},
-      {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
-      {"(car (cons (quote a) (quote (b c))))", "a"},
-      {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
-
-      // {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
-    };
-
-    for (auto iter {std::begin(prelude)}; iter != std::end(prelude); ++iter)
-    {
-      std::cerr << "prelude[" << std::distance(std::begin(prelude), iter) << "]< " << (*iter).first << std::endl;
-
-      std::stringstream buffer {};
-      buffer << lisp::evaluate((*iter).first);
-
-      std::cerr << buffer.str() << " -> \e[33m(selfcheck " << (buffer.str() != (*iter).second ? "failed" : "passed") << ")\e[0m\n\n";
+      std::cerr << "  \e[32m[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
     }
-  }
+
+    return expr;
+  };
+
+  evaluate["atom"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    highwrite(expr.at(1));
+    const auto buffer {evaluate(expr.at(1), scope)};
+    expr[1] = std::move(buffer);
+
+    return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
+  };
+
+  evaluate["eq"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
+  };
+
+  evaluate["cons"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    cell buffer {};
+
+    highwrite(expr.at(1));
+    buffer.push_back(evaluate(expr.at(1), scope));
+
+    highwrite(expr.at(2));
+    for (const auto& each : evaluate(expr.at(2), scope))
+    {
+      buffer.push_back(each);
+    }
+
+    return expr = std::move(buffer);
+  };
+
+  evaluate["car"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    highwrite(expr.at(1));
+    const auto buffer {evaluate(expr.at(1), scope).at(0)};
+    return expr = std::move(buffer);
+  };
+
+  evaluate["cdr"] = [&](auto& expr, auto& scope)
+    -> decltype(auto)
+  {
+    highwrite(expr.at(1));
+    auto buffer {evaluate(expr.at(1), scope)};
+    buffer.erase(std::begin(buffer));
+    return expr = std::move(buffer);
+  };
+
+  evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
+  evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
+  evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
+  evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
