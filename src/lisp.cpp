@@ -135,17 +135,7 @@ namespace lisp
 
     bool operator!=(const cell& rhs)
     {
-      if ((*this).state != rhs.state)
-      {
-        return true;
-      }
-
-      if ((*this).value != rhs.value)
-      {
-        return true;
-      }
-
-      if (std::size(*this) != std::size(rhs))
+      if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       {
         return true;
       }
@@ -262,6 +252,7 @@ namespace lisp
         return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
       case cell::type::list:
+        // TODO this block is removal if use std::vector<T>::at() insted of std::vector<T>::operator[]()
         if (std::empty(expr))
         {
           return expr = {};
@@ -318,12 +309,9 @@ namespace lisp
       std::cerr << "(error " << expr << " \"unexpected conditional break\")" << std::endl;
       std::exit(boost::exit_failure);
     }
-    catch (const std::exception& exception)
+    catch (const std::out_of_range&)
     {
-      #ifndef NDEBUG
-      std::cerr << "[debug] " << exception.what() << ", in " << expr << std::endl;
-      #endif
-      return expr = scope.at("nil");
+      return expr = scope["nil"];
     }
   } static evaluate;
 
@@ -374,21 +362,17 @@ int main(int argc, char** argv)
     evaluate["quote"] = [](auto& expr, auto&)
       -> decltype(auto)
     {
-      // return std::size(expr) < 2 ? scope["nil"] : (highwrite(expr[1]), expr[1]);
-      return highwrite(expr[1]), expr[1];
+      return highwrite(expr.at(1)), expr.at(1);
     };
 
     evaluate["cond"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      // while (std::size(expr) < 4)
-      // {
-      //   expr.emplace_back();
-      // }
+      highwrite(expr.at(1));
       return evaluate(
-               (highwrite(expr[1]), evaluate(expr[1], scope).value != "nil")
-                 ? (highwrite(expr[2]), expr[2])
-                 : (highwrite(expr[3]), expr[3]),
+               evaluate(expr.at(1), scope).value != "nil"
+                 ? (highwrite(expr.at(2)), expr.at(2))
+                 : (highwrite(expr.at(3)), expr.at(3)),
                scope
              );
     };
@@ -396,12 +380,8 @@ int main(int argc, char** argv)
     evaluate["define"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      // while (std::size(expr) < 3)
-      // {
-      //   expr.emplace_back();
-      // }
-      highwrite(expr[2]);
-      return scope[expr[1].value] = evaluate(expr[2], scope);
+      highwrite(expr.at(2));
+      return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
     };
 
     evaluate["lambda"] = [](auto& expr, auto& scope)
@@ -420,32 +400,17 @@ int main(int argc, char** argv)
     evaluate["atom"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      // if (std::size(expr) < 2)
-      // {
-      //   return scope["nil"];
-      // }
-      // else
-      // {
-        highwrite(expr[1]);
-        const auto buffer {evaluate(expr[1], scope)};
-        expr[1] = std::move(buffer);
+      highwrite(expr.at(1));
+      const auto buffer {evaluate(expr.at(1), scope)};
+      expr[1] = std::move(buffer);
 
-        // highwrite(expr[1]);
-        return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
-      // }
+      return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
     };
 
     evaluate["eq"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      // if (std::size(expr) < 3)
-      // {
-      //   return scope["nil"];
-      // }
-      // else
-      // {
-        return expr[1] != expr[2] ? scope["nil"] : scope["true"];
-      // }
+      return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
     };
 
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
