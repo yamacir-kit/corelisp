@@ -8,11 +8,12 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
-#include <boost/lexical_cast.hpp>
+// #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 
@@ -239,13 +240,21 @@ namespace lisp
   public:
     using signature = std::function<cell& (cell&, cell::scope_type&)>;
 
-    cell& operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
+    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
-      cell expr {s};
-      return operator()(expr, scope);
+      return operator()(cell {s}, scope);
     }
 
-    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope)
+    template <typename C,
+              typename = typename std::enable_if<
+                                    std::is_same<
+                                      typename std::remove_cv<
+                                        typename std::remove_reference<C>::type
+                                      >::type,
+                                      cell
+                                    >::value
+                                  >::type>
+    C operator()(C&& expr, cell::scope_type& scope = dynamic_scope)
     {
       switch (expr.state)
       {
@@ -261,7 +270,7 @@ namespace lisp
         if ((*this).find(expr[0].value) != std::end(*this))
         {
           highwrite(expr[0]);
-          const auto buffer {(*this).at(expr[0].value)(expr, scope)};
+          const cell buffer {(*this)[expr[0].value](expr, scope)};
           return expr = std::move(buffer);
         }
 
@@ -383,8 +392,10 @@ int main(int argc, char** argv)
       {
         expr.emplace_back();
       }
-      std::cerr << expr.highlight(expr[2]) << std::endl;
-      return scope[expr[1].value] = evaluate(expr[2], scope);
+      highwrite(expr[2]);
+      const auto label {expr[1].value};
+      scope.emplace(expr[1].value, evaluate(expr[2], scope));
+      return scope.at(expr[1].value);
     };
 
     evaluate["lambda"] = [](auto& expr, auto& scope)
@@ -392,10 +403,10 @@ int main(int argc, char** argv)
     {
       expr.closure = scope;
 
-      // for (const auto& each : expr.closure)
-      // {
-      //   std::cerr << "  \e[32mclosure[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
-      // }
+      for (const auto& each : expr.closure)
+      {
+        std::cerr << "  \e[32m[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
+      }
 
       return expr;
     };
@@ -453,11 +464,10 @@ int main(int argc, char** argv)
       {"(eq (quote a) (quote b))", "()"},
       {"(eq (quote ()) (quote ()))", "true"},
 
-      {"(define car (lambda (ad) (ad (lambda (a d) a))))", "(lambda (ad) (ad (lambda (a d) a)))"},
+      {"(define car (lambda (e) ((lambda (a d) a) e)))", "(lambda (e) ((lambda (a d) a) e))"},
       {"(car (quote (a b c)))", "a"},
 
-
-      {"(define cdr (lambda (ad) (ad (lambda (a d) d))))", "(lambda (ad) (ad (lambda (a d) d)))"},
+      {"(define cdr (lambda (e) ((lambda (a d) d) e)))", "(lambda (e) ((lambda (a d) d) e))"},
       {"(cdr (quote (a b c)))", "(b c)"},
 
       // {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
