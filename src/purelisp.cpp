@@ -56,6 +56,7 @@ namespace lisp
       return c == '(' || c == ')';
     }
 
+  #ifndef NDEBUG
     friend auto operator<<(std::ostream& os, tokenizer& tokens)
       -> std::ostream&
     {
@@ -65,6 +66,7 @@ namespace lisp
       }
       return os;
     }
+  #endif
 
   protected:
     template <typename InputIterator>
@@ -337,11 +339,16 @@ namespace lisp
       }
 
       highwrite(expr.at(1));
-      const auto result {std::accumulate(
-        std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {}
-      )};
+      const auto result {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
 
-      return expr = {cell::type::atom, result.str()};
+      if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
+      {
+        return expr = {cell::type::atom, result.str()};
+      }
+      else
+      {
+        return expr = {cell::type::atom, result != 0 ? "true" : "nil"};
+      }
     }
   };
 } // namespace lisp
@@ -446,6 +453,24 @@ int main(int argc, char** argv)
   evaluate["-"] = numeric_procedure<cpp_dec_float_100, std::minus> {};
   evaluate["*"] = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
   evaluate["/"] = numeric_procedure<cpp_dec_float_100, std::divides> {};
+  evaluate["="] = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
+  evaluate["<"] = numeric_procedure<cpp_dec_float_100, std::less> {};
+  evaluate["<="] = numeric_procedure<cpp_dec_float_100, std::less_equal> {};
+  evaluate[">"] = numeric_procedure<cpp_dec_float_100, std::greater> {};
+  evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
+
+  std::vector<std::string> prelude
+  {
+    "(define fib (lambda (n) (cond (<= n 1) n (+ (fib (- n 1)) (fib (- n 2))))))",
+    "(fib 10)"
+  };
+
+  for (const auto& each : prelude)
+  {
+    std::cerr << lisp::evaluate(each) << "\n\n";
+  }
+
+
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
