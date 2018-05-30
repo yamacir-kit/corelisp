@@ -322,18 +322,13 @@ namespace lisp
   } static evaluate;
 
 
-  template <template <typename...> typename BinaryOperaor, typename T>
+  template <template <typename...> typename BinaryOperator, typename T>
   class numeric_procedure
   {
   public:
-    template <typename... Ts>
-    using binary_operator = BinaryOperaor<Ts...>;
-
-    using value_type = T;
-
-    cell& operator()(cell& expr, cell::scope_type& scope) // try
+    cell& operator()(cell& expr, cell::scope_type& scope)
     {
-      std::vector<value_type> args {};
+      std::vector<T> args {};
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
@@ -343,7 +338,7 @@ namespace lisp
 
       highwrite(expr.at(1));
       const auto result {std::accumulate(
-        std::begin(args) + 1, std::end(args), args.front(), binary_operator<value_type> {}
+        std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {}
       )};
 
       return expr = {cell::type::atom, result.str()};
@@ -414,6 +409,40 @@ int main(int argc, char** argv)
       return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
     };
 
+    evaluate["cons"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      cell buffer {};
+
+      highwrite(expr.at(1));
+      buffer.push_back(evaluate(expr.at(1), scope));
+
+      highwrite(expr.at(2));
+      for (const auto& each : evaluate(expr.at(2), scope))
+      {
+        buffer.push_back(each);
+      }
+
+      return expr = std::move(buffer);
+    };
+
+    evaluate["car"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      highwrite(expr.at(1));
+      const auto buffer {evaluate(expr.at(1), scope).at(0)};
+      return expr = std::move(buffer);
+    };
+
+    evaluate["cdr"] = [&](auto& expr, auto& scope)
+      -> decltype(auto)
+    {
+      highwrite(expr.at(1));
+      auto buffer {evaluate(expr.at(1), scope)};
+      buffer.erase(std::begin(buffer));
+      return expr = std::move(buffer);
+    };
+
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
     evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
     evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
@@ -436,17 +465,17 @@ int main(int argc, char** argv)
       {"(eq (quote a) (quote b))", "()"},
       {"(eq (quote ()) (quote ()))", "true"},
 
-      {"(define car (lambda (e) ((lambda (a d) a) e)))", "(lambda (e) ((lambda (a d) a) e))"},
+      // {"(define car (lambda (e) ((lambda (a d) a) e)))", "(lambda (e) ((lambda (a d) a) e))"},
       {"(car (quote (a b c)))", "a"},
 
-      {"(define cdr (lambda (e) ((lambda (a d) d) e)))", "(lambda (e) ((lambda (a d) d) e))"},
+      // {"(define cdr (lambda (e) ((lambda (a d) d) e)))", "(lambda (e) ((lambda (a d) d) e))"},
       {"(cdr (quote (a b c)))", "(b c)"},
 
       // {"(define cons (lambda (a d) (lambda (f) (f a d))))", "(lambda (a d) (lambda (f) (f a d)))"},
-      // {"(cons (quote a) (quote (b c)))", "(a b c)"},
-      // {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
-      // {"(car (cons (quote a) (quote (b c))))", "a"},
-      // {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
+      {"(cons (quote a) (quote (b c)))", "(a b c)"},
+      {"(cons (quote a) (cons (quote b) (cons (quote c) (quote ()))))", "(a b c)"},
+      {"(car (cons (quote a) (quote (b c))))", "a"},
+      {"(cdr (cons (quote a) (quote (b c))))", "(b c)"},
 
       // {"(cond ((eq (quote a) (quote b)) (quote first)) ((atom (quote a)) (quote second)))", "second"}
     };
