@@ -313,6 +313,12 @@ namespace lisp
     {
       return expr = scope["nil"];
     }
+
+    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope)
+    {
+      const auto buffer {(*this)(expr, scope)};
+      return expr = std::move(buffer);
+    }
   } static evaluate;
 
 
@@ -327,26 +333,21 @@ namespace lisp
 
     cell& operator()(cell& expr, cell::scope_type& scope) // try
     {
-      std::vector<value_type> buffer {};
+      std::vector<value_type> args {};
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
-        std::cerr << expr.highlight(*iter) << std::endl;
-        *iter = evaluate(*iter, scope); // XXX DANGER?
-        buffer.emplace_back(iter->value);
+        highwrite(*iter);
+        args.emplace_back(evaluate.replace_by_buffered_evaluation(*iter, scope).value);
       }
 
+      highwrite(expr.at(1));
       const auto result {std::accumulate(
-        std::begin(buffer) + 1, std::end(buffer), buffer.front(), binary_operator<value_type> {}
+        std::begin(args) + 1, std::end(args), args.front(), binary_operator<value_type> {}
       )};
 
       return expr = {cell::type::atom, result.str()};
     }
-    // catch (std::exception& exception)
-    // {
-    //   std::cerr << "(error " << expr << " \"" << exception.what() << "\")" << std::endl;
-    //   return expr = scope["nil"];
-    // }
   };
 } // namespace lisp
 
