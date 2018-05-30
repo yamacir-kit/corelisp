@@ -6,6 +6,10 @@ Version ${PROJECT_VERSION} in development.
 
 To do description.
 
+## Design Policy
+
+As short as possible. But, must NOT be dismissed readability, maintainability, speed, and above all, beautifulness.
+
 ## Dependency
 
 - C++17
@@ -14,6 +18,6 @@ To do description.
 ## Build
 
 ``` sh
-mkdir -p build && cd build && make
+mkdir -p build && cd build && cmake .. && make
 ```
 
