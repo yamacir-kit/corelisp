@@ -7,13 +7,13 @@
 #include <numeric> // std::accumulate
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
-// #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 
@@ -254,7 +254,7 @@ namespace lisp
                                       cell
                                     >::value
                                   >::type>
-    C operator()(C&& expr, cell::scope_type& scope = dynamic_scope)
+    C operator()(C&& expr, cell::scope_type& scope = dynamic_scope) try
     {
       switch (expr.state)
       {
@@ -318,6 +318,13 @@ namespace lisp
       std::cerr << "(error " << expr << " \"unexpected conditional break\")" << std::endl;
       std::exit(boost::exit_failure);
     }
+    catch (const std::exception& exception)
+    {
+      #ifndef NDEBUG
+      std::cerr << "[debug] " << exception.what() << ", in " << expr << std::endl;
+      #endif
+      return expr = scope.at("nil");
+    }
   } static evaluate;
 
 
@@ -330,7 +337,7 @@ namespace lisp
 
     using value_type = T;
 
-    cell& operator()(cell& expr, cell::scope_type& scope) try
+    cell& operator()(cell& expr, cell::scope_type& scope) // try
     {
       std::vector<value_type> buffer {};
 
@@ -347,11 +354,11 @@ namespace lisp
 
       return expr = {cell::type::atom, result.str()};
     }
-    catch (std::exception& exception)
-    {
-      std::cerr << "(error " << expr << " \"" << exception.what() << "\")" << std::endl;
-      return expr = scope["nil"];
-    }
+    // catch (std::exception& exception)
+    // {
+    //   std::cerr << "(error " << expr << " \"" << exception.what() << "\")" << std::endl;
+    //   return expr = scope["nil"];
+    // }
   };
 } // namespace lisp
 
@@ -364,23 +371,24 @@ int main(int argc, char** argv)
     using namespace lisp;
     using namespace boost::multiprecision;
 
-    evaluate["quote"] = [](auto& expr, auto& scope)
+    evaluate["quote"] = [](auto& expr, auto&)
       -> decltype(auto)
     {
-      return std::size(expr) < 2 ? scope["nil"] : (highwrite(expr[1]), expr[1]);
+      // return std::size(expr) < 2 ? scope["nil"] : (highwrite(expr[1]), expr[1]);
+      return highwrite(expr[1]), expr[1];
     };
 
     evaluate["cond"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      while (std::size(expr) < 4)
-      {
-        expr.emplace_back();
-      }
+      // while (std::size(expr) < 4)
+      // {
+      //   expr.emplace_back();
+      // }
       return evaluate(
-               (std::cerr << expr.highlight(expr[1]) << std::endl, evaluate(expr[1], scope).value != "nil")
-                 ? (std::cerr << expr.highlight(expr[2]) << std::endl, expr[2])
-                 : (std::cerr << expr.highlight(expr[3]) << std::endl, expr[3]),
+               (highwrite(expr[1]), evaluate(expr[1], scope).value != "nil")
+                 ? (highwrite(expr[2]), expr[2])
+                 : (highwrite(expr[3]), expr[3]),
                scope
              );
     };
@@ -388,14 +396,12 @@ int main(int argc, char** argv)
     evaluate["define"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      while (std::size(expr) < 3)
-      {
-        expr.emplace_back();
-      }
+      // while (std::size(expr) < 3)
+      // {
+      //   expr.emplace_back();
+      // }
       highwrite(expr[2]);
-      const auto label {expr[1].value};
-      scope.emplace(expr[1].value, evaluate(expr[2], scope));
-      return scope.at(expr[1].value);
+      return scope[expr[1].value] = evaluate(expr[2], scope);
     };
 
     evaluate["lambda"] = [](auto& expr, auto& scope)
@@ -414,32 +420,32 @@ int main(int argc, char** argv)
     evaluate["atom"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      if (std::size(expr) < 2)
-      {
-        return scope["nil"];
-      }
-      else
-      {
+      // if (std::size(expr) < 2)
+      // {
+      //   return scope["nil"];
+      // }
+      // else
+      // {
         highwrite(expr[1]);
         const auto buffer {evaluate(expr[1], scope)};
         expr[1] = std::move(buffer);
 
-        highwrite(expr[1]);
+        // highwrite(expr[1]);
         return expr[1].state != cell::type::atom && std::size(expr[1]) != 0 ? scope["nil"] : scope["true"];
-      }
+      // }
     };
 
     evaluate["eq"] = [&](auto& expr, auto& scope)
       -> decltype(auto)
     {
-      if (std::size(expr) < 3)
-      {
-        return scope["nil"];
-      }
-      else
-      {
+      // if (std::size(expr) < 3)
+      // {
+      //   return scope["nil"];
+      // }
+      // else
+      // {
         return expr[1] != expr[2] ? scope["nil"] : scope["true"];
-      }
+      // }
     };
 
     evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
