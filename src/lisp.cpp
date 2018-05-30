@@ -322,7 +322,7 @@ namespace lisp
   } static evaluate;
 
 
-  template <template <typename...> typename BinaryOperator, typename T>
+  template <typename T, template <typename...> typename BinaryOperator>
   class numeric_procedure
   {
   public:
@@ -442,10 +442,10 @@ int main(int argc, char** argv)
     return expr = std::move(buffer);
   };
 
-  evaluate["+"] = numeric_procedure<std::plus, cpp_dec_float_100> {};
-  evaluate["-"] = numeric_procedure<std::minus, cpp_dec_float_100> {};
-  evaluate["*"] = numeric_procedure<std::multiplies, cpp_dec_float_100> {};
-  evaluate["/"] = numeric_procedure<std::divides, cpp_dec_float_100> {};
+  evaluate["+"] = numeric_procedure<cpp_dec_float_100, std::plus> {};
+  evaluate["-"] = numeric_procedure<cpp_dec_float_100, std::minus> {};
+  evaluate["*"] = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
+  evaluate["/"] = numeric_procedure<cpp_dec_float_100, std::divides> {};
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
