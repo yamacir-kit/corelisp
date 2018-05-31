@@ -1,6 +1,6 @@
 # Pure LISP interpreter by C++17
 
-Version 1.0.0 in development.
+Version 1.0.6 in development.
 
 ## Overview
 
