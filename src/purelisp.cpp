@@ -18,6 +18,7 @@
 
 
 #define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << std::endl
 
 
 namespace lisp
@@ -56,7 +57,6 @@ namespace lisp
       return c == '(' || c == ')';
     }
 
-  #ifndef NDEBUG
     friend auto operator<<(std::ostream& os, tokenizer& tokens)
       -> std::ostream&
     {
@@ -66,7 +66,6 @@ namespace lisp
       }
       return os;
     }
-  #endif
 
   protected:
     template <typename InputIterator>
@@ -89,7 +88,6 @@ namespace lisp
              });
     }
   } static tokenize;
-
 
   class cell
     : public std::vector<cell>
@@ -144,7 +142,7 @@ namespace lisp
 
       for (std::size_t index {0}; index < std::size(*this); ++index)
       {
-        if ((*this)[index] != rhs[index])
+        if ((*this)[index] != rhs[index]) // (std::size(*this) == std::size(rhs)) == true
         {
           return true;
         }
@@ -251,15 +249,9 @@ namespace lisp
       switch (expr.state)
       {
       case cell::type::atom:
-        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : (std::cerr << "(unbound expression) -> ", expr);
+        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
       case cell::type::list:
-        // // TODO this block is removal if use std::vector<T>::at() insted of std::vector<T>::operator[]()
-        // if (std::empty(expr))
-        // {
-        //   return expr = {};
-        // }
-
         if ((*this).find(expr.at(0).value) != std::end(*this))
         {
           highwrite(expr[0]);
@@ -271,54 +263,37 @@ namespace lisp
         switch (replace_by_buffered_evaluation(expr[0], scope).state)
         {
         case cell::type::list:
-          // if (expr[0][0].value == "lambda")
-          // {
-          //   if (std::size(expr[0][1]) != std::size(expr) - 1)
-          //   {
-          //     std::cerr << "(error " << expr << " \"argument size is unmatched with parameter size\")" << std::endl;
-          //     return scope["nil"];
-          //   }
-          //
-            for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
-            {
-              highwrite(expr[index + 1]);
-              expr.closure[expr[0][1][index].value] = (*this)(expr[index + 1], scope);
-            }
+          for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
+          {
+            highwrite(expr.at(index + 1));
+            expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
+          }
 
-            highwrite(expr[0][2]);
-            return (*this)(expr[0][2], expr.closure);
-          // }
-          // else
-          // {
-          //   std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
-          //   return scope["nil"];
-          // }
+          for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
+          {
+            expr.closure.emplace(each);
+          }
+
+          highwrite(expr[0].at(2));
+          return (*this)(expr[0].at(2), expr.closure);
 
         case cell::type::atom:
-          // if ((*this).find(expr[0].value) != std::end(*this))
-          // {
-          //   highwrite(expr[0]);
-            return (*this).at(expr[0].value)(expr, scope);
-          // }
-          // else
-          // {
-          //   std::cerr << "(error " << expr << " \"unknown procedure\")" << std::endl;
-          //   return scope["nil"];
-          // }
+          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+          {
+            highwrite(*iter);
+            (*this).replace_by_buffered_evaluation(*iter, scope);
+          }
+
+          highwrite(expr[0]);
+          return (*this)(scope.at(expr[0].value), scope);
         }
       }
-      //
-      // std::cerr << "(error " << expr << " \"unexpected conditional break\")" << std::endl;
-      // std::exit(boost::exit_failure);
+
+      std::exit(boost::exit_failure);
     }
-    catch (const std::out_of_range& ex)
+    catch (const std::exception& ex)
     {
-      std::cerr << "(out_of_range " << ex.what() << ") -> " << std::flush;
-      return expr = scope["nil"];
-    }
-    catch (const std::runtime_error& ex)
-    {
-      std::cerr << "(runtime_error " << ex.what() << ") -> " << std::flush;
+      std::cerr << "(runtime_error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
       return expr = scope["nil"];
     }
 
@@ -353,7 +328,8 @@ namespace lisp
       }
       else
       {
-        return expr = {cell::type::atom, result != 0 ? "true" : "nil"};
+        // return expr = {cell::type::atom, result != 0 ? "true" : "nil"};
+        return expr = (result != 0 ? scope.at("true") : scope["nil"]);
       }
     }
   };
@@ -378,7 +354,7 @@ int main(int argc, char** argv)
   {
     highwrite(expr.at(1));
     return evaluate(
-             evaluate(expr.at(1), scope).value != "nil"
+             evaluate(expr.at(1), scope) != scope["nil"]
                ? (highwrite(expr.at(2)), expr.at(2))
                : (highwrite(expr.at(3)), expr.at(3)),
              scope
@@ -396,12 +372,6 @@ int main(int argc, char** argv)
     -> decltype(auto)
   {
     expr.closure = scope;
-
-    for (const auto& each : expr.closure)
-    {
-      std::cerr << "  \e[32m[" << each.first << "] = " << each.second << "\e[0m" << std::endl;
-    }
-
     return expr;
   };
 
@@ -435,6 +405,14 @@ int main(int argc, char** argv)
       buffer.push_back(each);
     }
 
+    // for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+    // {
+    //   for (const auto& each : evaluate(*iter, scope))
+    //   {
+    //     buffer.push_back(each);
+    //   }
+    // }
+
     return expr = std::move(buffer);
   };
 
@@ -455,14 +433,14 @@ int main(int argc, char** argv)
     return expr = std::move(buffer);
   };
 
-  evaluate["+"] = numeric_procedure<cpp_dec_float_100, std::plus> {};
-  evaluate["-"] = numeric_procedure<cpp_dec_float_100, std::minus> {};
-  evaluate["*"] = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
-  evaluate["/"] = numeric_procedure<cpp_dec_float_100, std::divides> {};
-  evaluate["="] = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
-  evaluate["<"] = numeric_procedure<cpp_dec_float_100, std::less> {};
+  evaluate["+"]  = numeric_procedure<cpp_dec_float_100, std::plus> {};
+  evaluate["-"]  = numeric_procedure<cpp_dec_float_100, std::minus> {};
+  evaluate["*"]  = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
+  evaluate["/"]  = numeric_procedure<cpp_dec_float_100, std::divides> {};
+  evaluate["="]  = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
+  evaluate["<"]  = numeric_procedure<cpp_dec_float_100, std::less> {};
   evaluate["<="] = numeric_procedure<cpp_dec_float_100, std::less_equal> {};
-  evaluate[">"] = numeric_procedure<cpp_dec_float_100, std::greater> {};
+  evaluate[">"]  = numeric_procedure<cpp_dec_float_100, std::greater> {};
   evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
 
   std::vector<std::string> prelude
@@ -475,8 +453,6 @@ int main(int argc, char** argv)
   {
     std::cerr << lisp::evaluate(each) << "\n\n";
   }
-
-
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
