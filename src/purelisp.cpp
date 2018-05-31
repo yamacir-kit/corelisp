@@ -251,16 +251,16 @@ namespace lisp
       switch (expr.state)
       {
       case cell::type::atom:
-        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
+        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : (std::cerr << "(unbound expression) -> ", expr);
 
       case cell::type::list:
-        // TODO this block is removal if use std::vector<T>::at() insted of std::vector<T>::operator[]()
-        if (std::empty(expr))
-        {
-          return expr = {};
-        }
+        // // TODO this block is removal if use std::vector<T>::at() insted of std::vector<T>::operator[]()
+        // if (std::empty(expr))
+        // {
+        //   return expr = {};
+        // }
 
-        if ((*this).find(expr[0].value) != std::end(*this))
+        if ((*this).find(expr.at(0).value) != std::end(*this))
         {
           highwrite(expr[0]);
           const cell buffer {(*this)[expr[0].value](expr, scope)};
@@ -268,17 +268,17 @@ namespace lisp
         }
 
         highwrite(expr[0]);
-        switch (const auto buffer {(*this)(expr[0], scope)}; (expr[0] = std::move(buffer)).state)
+        switch (replace_by_buffered_evaluation(expr[0], scope).state)
         {
         case cell::type::list:
-          if (expr[0][0].value == "lambda")
-          {
-            if (std::size(expr[0][1]) != std::size(expr) - 1)
-            {
-              std::cerr << "(error " << expr << " \"argument size is unmatched with parameter size\")" << std::endl;
-              return scope["nil"];
-            }
-
+          // if (expr[0][0].value == "lambda")
+          // {
+          //   if (std::size(expr[0][1]) != std::size(expr) - 1)
+          //   {
+          //     std::cerr << "(error " << expr << " \"argument size is unmatched with parameter size\")" << std::endl;
+          //     return scope["nil"];
+          //   }
+          //
             for (std::size_t index {0}; index < std::size(expr[0][1]); ++index)
             {
               highwrite(expr[index + 1]);
@@ -287,32 +287,38 @@ namespace lisp
 
             highwrite(expr[0][2]);
             return (*this)(expr[0][2], expr.closure);
-          }
-          else
-          {
-            std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
-            return scope["nil"];
-          }
+          // }
+          // else
+          // {
+          //   std::cerr << "(error " << expr << " \"folloing expression isn't a lambda\")" << std::endl;
+          //   return scope["nil"];
+          // }
 
         case cell::type::atom:
-          if ((*this).find(expr[0].value) != std::end(*this))
-          {
-            highwrite(expr[0]);
+          // if ((*this).find(expr[0].value) != std::end(*this))
+          // {
+          //   highwrite(expr[0]);
             return (*this).at(expr[0].value)(expr, scope);
-          }
-          else
-          {
-            std::cerr << "(error " << expr << " \"unknown procedure\")" << std::endl;
-            return scope["nil"];
-          }
+          // }
+          // else
+          // {
+          //   std::cerr << "(error " << expr << " \"unknown procedure\")" << std::endl;
+          //   return scope["nil"];
+          // }
         }
       }
-
-      std::cerr << "(error " << expr << " \"unexpected conditional break\")" << std::endl;
-      std::exit(boost::exit_failure);
+      //
+      // std::cerr << "(error " << expr << " \"unexpected conditional break\")" << std::endl;
+      // std::exit(boost::exit_failure);
     }
-    catch (const std::out_of_range&)
+    catch (const std::out_of_range& ex)
     {
+      std::cerr << "(out_of_range " << ex.what() << ") -> " << std::flush;
+      return expr = scope["nil"];
+    }
+    catch (const std::runtime_error& ex)
+    {
+      std::cerr << "(runtime_error " << ex.what() << ") -> " << std::flush;
       return expr = scope["nil"];
     }
 
