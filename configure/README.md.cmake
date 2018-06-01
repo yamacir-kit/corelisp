@@ -10,6 +10,9 @@ To do description.
 
 As short as possible. But, must NOT be dismissed readability, maintainability, speed, and above all, beautifulness.
 
+- 純LISP以上の機能を求めない。
+  組み込み関数を簡潔に追加可能なAPIを提供するに留める。
+
 ## Dependency
 
 - C++17

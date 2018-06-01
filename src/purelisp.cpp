@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -18,7 +19,31 @@
 
 
 #define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
-// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << std::endl
+
+
+namespace lisp::regex
+{
+  auto escape_regex_specials(const std::string& s)
+    -> std::string
+  {
+    auto buffer {s};
+
+    static const std::vector<std::string> regex_specials // 多分足りない
+    {
+      "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
+    };
+
+    for (const auto& special : regex_specials)
+    {
+      for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
+      {
+        buffer.replace(pos, 1, std::string {"\\"} + special);
+      }
+    }
+
+    return buffer;
+  }
+} // namespace lisp::regex
 
 
 namespace lisp
@@ -178,7 +203,7 @@ namespace lisp
     {
       std::stringstream sstream {}, pattern {};
       sstream << *this;
-      pattern << "^(.*?[\\s|\\(]?)(" << escape_regex_specials(target) << ")([\\s|\\)].*)$";
+      pattern << "^(.*?[\\s|\\(]?)(" << regex::escape_regex_specials(target) << ")([\\s|\\)].*)$";
       return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
     }
 
@@ -195,28 +220,28 @@ namespace lisp
         return highlight(expr.value);
       }
     }
-
-  protected:
-    auto escape_regex_specials(const std::string& s)
-      -> std::string
-    {
-      auto buffer {s};
-
-      static const std::vector<std::string> regex_specials // 多分足りない
-      {
-        "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
-      };
-
-      for (const auto& special : regex_specials)
-      {
-        for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
-        {
-          buffer.replace(pos, 1, std::string {"\\"} + special);
-        }
-      }
-
-      return buffer;
-    }
+  //
+  // protected:
+  //   decltype(auto) escape_regex_specials(const std::string& s)
+  //     // -> std::string
+  //   {
+  //     auto buffer {s};
+  //
+  //     static const std::vector<std::string> regex_specials // 多分足りない
+  //     {
+  //       "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
+  //     };
+  //
+  //     for (const auto& special : regex_specials)
+  //     {
+  //       for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
+  //       {
+  //         buffer.replace(pos, 1, std::string {"\\"} + special);
+  //       }
+  //     }
+  //
+  //     return buffer;
+  //   }
   };
 
 
@@ -346,7 +371,8 @@ int main(int argc, char** argv)
   evaluate["quote"] = [](auto& expr, auto&)
     -> decltype(auto)
   {
-    return highwrite(expr.at(1)), expr.at(1);
+    highwrite(expr.at(1));
+    return expr.at(1);
   };
 
   evaluate["cond"] = [&](auto& expr, auto& scope)
@@ -405,14 +431,6 @@ int main(int argc, char** argv)
       buffer.push_back(each);
     }
 
-    // for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-    // {
-    //   for (const auto& each : evaluate(*iter, scope))
-    //   {
-    //     buffer.push_back(each);
-    //   }
-    // }
-
     return expr = std::move(buffer);
   };
 
@@ -445,8 +463,7 @@ int main(int argc, char** argv)
 
   std::vector<std::string> prelude
   {
-    "(define fib (lambda (n) (cond (<= n 1) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(fib 10)"
+    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))"
   };
 
   for (const auto& each : prelude)
@@ -457,7 +474,13 @@ int main(int argc, char** argv)
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    std::cout << lisp::evaluate(buffer) << "\n\n";
+    const auto begin {std::chrono::high_resolution_clock::now()};
+    std::cout << lisp::evaluate(buffer) << std::flush;
+    std::cerr << " in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::high_resolution_clock::now() - begin
+                 ).count()
+              << "ms" << "\n\n";
   }
 
   return boost::exit_success;
