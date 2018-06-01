@@ -10,15 +10,18 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/scope_exit.hpp>
 
 
-#define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+#define highwrite(CELL) std::cerr << std::flush
 
 
 namespace lisp::regex
@@ -230,23 +233,41 @@ namespace lisp
       {"true", cell {cell::type::atom, "true"}}
     };
 
+    cell buffer_;
+    std::size_t previous_lines;
+
   public:
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       return operator()(cell {s}, scope);
     }
 
-    template <typename C,
-              typename = typename std::enable_if<
-                                    std::is_same<
-                                      typename std::remove_cv<
-                                        typename std::remove_reference<C>::type
-                                      >::type,
-                                      cell
-                                    >::value
-                                  >::type>
-    C operator()(C&& expr, cell::scope_type& scope = dynamic_scope) try
+    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope)
     {
+      buffer_ = expr;
+      return operator()(buffer_, scope);
+    }
+
+    // template <typename C,
+    //           typename = typename std::enable_if<
+    //                                 std::is_same<
+    //                                   typename std::remove_cv<
+    //                                     typename std::remove_reference<C>::type
+    //                                   >::type,
+    //                                   cell
+    //                                 >::value
+    //                               >::type>
+    // C operator()(C&& expr, cell::scope_type& scope = dynamic_scope) try
+    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope) try
+    {
+      #ifndef NDEBUG
+      BOOST_SCOPE_EXIT_ALL(this)
+      {
+        std::cerr << "\r\e[K" << buffer_ << " -> " << std::flush;
+        std::this_thread::sleep_for(std::chrono::milliseconds {100});
+      };
+      #endif // NDEBUG
+
       switch (expr.state)
       {
       case cell::type::atom:
@@ -264,29 +285,39 @@ namespace lisp
         switch (replace_by_buffered_evaluation(expr[0], scope).state)
         {
         case cell::type::list:
-          for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
           {
-            highwrite(expr.at(index + 1));
-            expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
-          }
+            for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
+            {
+              highwrite(expr.at(index + 1));
+              expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
+            }
 
-          for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
-          {
-            expr.closure.emplace(each);
-          }
+            for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
+            {
+              expr.closure.emplace(each);
+            }
 
-          highwrite(expr[0].at(2));
-          return (*this)(expr[0].at(2), expr.closure);
+            highwrite(expr[0].at(2));
+            // return (*this)(expr[0].at(2), expr.closure);
+            // return (*this).replace_by_buffered_evaluation(expr[0].at(2), expr.closure);
+            const auto buffer {(*this)(expr[0].at(2), expr.closure)};
+            return expr = std::move(buffer);
+          }
 
         case cell::type::atom:
-          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
           {
-            highwrite(*iter);
-            (*this).replace_by_buffered_evaluation(*iter, scope);
-          }
+            for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+            {
+              highwrite(*iter);
+              (*this).replace_by_buffered_evaluation(*iter, scope);
+            }
 
-          highwrite(expr[0]);
-          return (*this)(scope.at(expr[0].value), scope);
+            highwrite(expr[0]);
+            // return (*this)(scope.at(expr[0].value), scope);
+            // return (*this).replace_by_buffered_evaluation(scope.at(expr[0].value), scope);
+            const auto buffer {(*this)(scope.at(expr[0].value), scope)};
+            return expr = std::move(buffer);
+          }
         }
       }
 
@@ -439,7 +470,7 @@ int main(int argc, char** argv)
   std::vector<std::string> prelude
   {
     "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(fib 10)"
+    "(fib 3)"
   };
 
   for (const auto& each : prelude)
