@@ -220,28 +220,6 @@ namespace lisp
         return highlight(expr.value);
       }
     }
-  //
-  // protected:
-  //   decltype(auto) escape_regex_specials(const std::string& s)
-  //     // -> std::string
-  //   {
-  //     auto buffer {s};
-  //
-  //     static const std::vector<std::string> regex_specials // 多分足りない
-  //     {
-  //       "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
-  //     };
-  //
-  //     for (const auto& special : regex_specials)
-  //     {
-  //       for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
-  //       {
-  //         buffer.replace(pos, 1, std::string {"\\"} + special);
-  //       }
-  //     }
-  //
-  //     return buffer;
-  //   }
   };
 
 
@@ -253,8 +231,6 @@ namespace lisp
     };
 
   public:
-    using signature = std::function<cell& (cell&, cell::scope_type&)>;
-
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       return operator()(cell {s}, scope);
@@ -405,8 +381,7 @@ int main(int argc, char** argv)
     -> decltype(auto)
   {
     highwrite(expr.at(1));
-    const auto buffer {evaluate(expr.at(1), scope)};
-    expr[1] = std::move(buffer);
+    evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
 
     return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
   };
@@ -463,7 +438,8 @@ int main(int argc, char** argv)
 
   std::vector<std::string> prelude
   {
-    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))"
+    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
+    "(fib 10)"
   };
 
   for (const auto& each : prelude)
