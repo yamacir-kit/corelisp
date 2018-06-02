@@ -1,24 +1,54 @@
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <iterator>
 #include <locale>
 #include <map>
 #include <numeric>
-#include <regex>
+// #include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/scope_exit.hpp>
 
+#include <unistd.h>
+#include <sys/ioctl.h>
 
-#define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
-// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << std::endl
+// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
+// #define highwrite(CELL) std::cerr << std::flush
+//
+//
+// namespace lisp::regex
+// {
+//   auto escape_regex_specials(const std::string& s)
+//     -> std::string
+//   {
+//     auto buffer {s};
+//
+//     static const std::vector<std::string> regex_specials // 多分足りない
+//     {
+//       "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
+//     };
+//
+//     for (const auto& special : regex_specials)
+//     {
+//       for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
+//       {
+//         buffer.replace(pos, 1, std::string {"\\"} + special);
+//       }
+//     }
+//
+//     return buffer;
+//   }
+// } // namespace lisp::regex
 
 
 namespace lisp
@@ -37,10 +67,7 @@ namespace lisp
 
     auto& operator()(const std::string& s)
     {
-      if (!std::empty(*this))
-      {
-        clear();
-      }
+      clear();
 
       for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
       {
@@ -174,49 +201,27 @@ namespace lisp
       }
     }
 
-    auto highlight(const std::string& target)
-    {
-      std::stringstream sstream {}, pattern {};
-      sstream << *this;
-      pattern << "^(.*?[\\s|\\(]?)(" << escape_regex_specials(target) << ")([\\s|\\)].*)$";
-      return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
-    }
-
-    decltype(auto) highlight(const cell& expr)
-    {
-      if (expr.state != type::atom)
-      {
-        std::stringstream sstream {};
-        sstream << expr;
-        return highlight(sstream.str());
-      }
-      else
-      {
-        return highlight(expr.value);
-      }
-    }
-
-  protected:
-    auto escape_regex_specials(const std::string& s)
-      -> std::string
-    {
-      auto buffer {s};
-
-      static const std::vector<std::string> regex_specials // 多分足りない
-      {
-        "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
-      };
-
-      for (const auto& special : regex_specials)
-      {
-        for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
-        {
-          buffer.replace(pos, 1, std::string {"\\"} + special);
-        }
-      }
-
-      return buffer;
-    }
+    // auto highlight(const std::string& target)
+    // {
+    //   std::stringstream sstream {}, pattern {};
+    //   sstream << *this;
+    //   pattern << "^(.*?[\\s|\\(]?)(" << regex::escape_regex_specials(target) << ")([\\s|\\)].*)$";
+    //   return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
+    // }
+    //
+    // decltype(auto) highlight(const cell& expr)
+    // {
+    //   if (expr.state != type::atom)
+    //   {
+    //     std::stringstream sstream {};
+    //     sstream << expr;
+    //     return highlight(sstream.str());
+    //   }
+    //   else
+    //   {
+    //     return highlight(expr.value);
+    //   }
+    // }
   };
 
 
@@ -227,25 +232,55 @@ namespace lisp
       {"true", cell {cell::type::atom, "true"}}
     };
 
-  public:
-    using signature = std::function<cell& (cell&, cell::scope_type&)>;
+    cell buffer_;
 
+    #ifndef NDEBUG
+    static inline std::size_t previous_lines {0};
+    struct winsize window_size;
+    #endif // NDEBUG
+
+  public:
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
     {
       return operator()(cell {s}, scope);
     }
 
-    template <typename C,
-              typename = typename std::enable_if<
-                                    std::is_same<
-                                      typename std::remove_cv<
-                                        typename std::remove_reference<C>::type
-                                      >::type,
-                                      cell
-                                    >::value
-                                  >::type>
-    C operator()(C&& expr, cell::scope_type& scope = dynamic_scope) try
+    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope)
     {
+      buffer_ = expr;
+      return operator()(buffer_, scope);
+    }
+
+    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope) try
+    {
+      #ifndef NDEBUG
+      BOOST_SCOPE_EXIT_ALL(this)
+      {
+        ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
+
+        if (0 < previous_lines)
+        {
+          for (std::size_t row {previous_lines}; 0 < row; --row)
+          {
+            std::cerr << "\r\e[K\e[A";
+          }
+        }
+
+        std::stringstream ss {};
+        ss << buffer_;
+
+        previous_lines = std::size(ss.str()) / window_size.ws_col;
+
+        if (std::size(ss.str()) % window_size.ws_col == 0)
+        {
+          ++previous_lines;
+        }
+
+        std::cerr << "\r\e[K" << buffer_ << std::flush;
+        std::this_thread::sleep_for(std::chrono::milliseconds {10});
+      };
+      #endif // NDEBUG
+
       switch (expr.state)
       {
       case cell::type::atom:
@@ -254,38 +289,48 @@ namespace lisp
       case cell::type::list:
         if ((*this).find(expr.at(0).value) != std::end(*this))
         {
-          highwrite(expr[0]);
+          // highwrite(expr[0]);
           const cell buffer {(*this)[expr[0].value](expr, scope)};
           return expr = std::move(buffer);
         }
 
-        highwrite(expr[0]);
+        // highwrite(expr[0]);
         switch (replace_by_buffered_evaluation(expr[0], scope).state)
         {
         case cell::type::list:
-          for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
           {
-            highwrite(expr.at(index + 1));
-            expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
-          }
+            for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
+            {
+              // highwrite(expr.at(index + 1));
+              expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
+            }
 
-          for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
-          {
-            expr.closure.emplace(each);
-          }
+            for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
+            {
+              expr.closure.emplace(each);
+            }
 
-          highwrite(expr[0].at(2));
-          return (*this)(expr[0].at(2), expr.closure);
+            // highwrite(expr[0].at(2));
+            // return (*this)(expr[0].at(2), expr.closure);
+            // return (*this).replace_by_buffered_evaluation(expr[0].at(2), expr.closure);
+            const auto buffer {(*this)(expr[0].at(2), expr.closure)};
+            return expr = std::move(buffer);
+          }
 
         case cell::type::atom:
-          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
           {
-            highwrite(*iter);
-            (*this).replace_by_buffered_evaluation(*iter, scope);
-          }
+            for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+            {
+              // highwrite(*iter);
+              (*this).replace_by_buffered_evaluation(*iter, scope);
+            }
 
-          highwrite(expr[0]);
-          return (*this)(scope.at(expr[0].value), scope);
+            // highwrite(expr[0]);
+            // return (*this)(scope.at(expr[0].value), scope);
+            // return (*this).replace_by_buffered_evaluation(scope.at(expr[0].value), scope);
+            const auto buffer {(*this)(scope.at(expr[0].value), scope)};
+            return expr = std::move(buffer);
+          }
         }
       }
 
@@ -315,11 +360,11 @@ namespace lisp
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
-        highwrite(*iter);
+        // highwrite(*iter);
         args.emplace_back(evaluate.replace_by_buffered_evaluation(*iter, scope).value);
       }
 
-      highwrite(expr.at(1));
+      // highwrite(expr.at(1));
       const auto result {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
@@ -346,25 +391,27 @@ int main(int argc, char** argv)
   evaluate["quote"] = [](auto& expr, auto&)
     -> decltype(auto)
   {
-    return highwrite(expr.at(1)), expr.at(1);
+    // highwrite(expr.at(1));
+    return expr.at(1);
   };
 
   evaluate["cond"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    highwrite(expr.at(1));
-    return evaluate(
-             evaluate(expr.at(1), scope) != scope["nil"]
-               ? (highwrite(expr.at(2)), expr.at(2))
-               : (highwrite(expr.at(3)), expr.at(3)),
-             scope
-           );
+    // highwrite(expr.at(1));
+    // return evaluate(
+    //          evaluate(expr.at(1), scope) != scope["nil"]
+    //            ? (highwrite(expr.at(2)), expr.at(2))
+    //            : (highwrite(expr.at(3)), expr.at(3)),
+    //          scope
+    //        );
+    return evaluate(evaluate(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
   };
 
   evaluate["define"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    highwrite(expr.at(2));
+    // highwrite(expr.at(2));
     return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
   };
 
@@ -378,9 +425,8 @@ int main(int argc, char** argv)
   evaluate["atom"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    highwrite(expr.at(1));
-    const auto buffer {evaluate(expr.at(1), scope)};
-    expr[1] = std::move(buffer);
+    // highwrite(expr.at(1));
+    evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
 
     return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
   };
@@ -396,22 +442,14 @@ int main(int argc, char** argv)
   {
     cell buffer {};
 
-    highwrite(expr.at(1));
+    // highwrite(expr.at(1));
     buffer.push_back(evaluate(expr.at(1), scope));
 
-    highwrite(expr.at(2));
+    // highwrite(expr.at(2));
     for (const auto& each : evaluate(expr.at(2), scope))
     {
       buffer.push_back(each);
     }
-
-    // for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-    // {
-    //   for (const auto& each : evaluate(*iter, scope))
-    //   {
-    //     buffer.push_back(each);
-    //   }
-    // }
 
     return expr = std::move(buffer);
   };
@@ -419,7 +457,7 @@ int main(int argc, char** argv)
   evaluate["car"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    highwrite(expr.at(1));
+    // highwrite(expr.at(1));
     const auto buffer {evaluate(expr.at(1), scope).at(0)};
     return expr = std::move(buffer);
   };
@@ -427,7 +465,7 @@ int main(int argc, char** argv)
   evaluate["cdr"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    highwrite(expr.at(1));
+    // highwrite(expr.at(1));
     auto buffer {evaluate(expr.at(1), scope)};
     buffer.erase(std::begin(buffer));
     return expr = std::move(buffer);
@@ -445,19 +483,29 @@ int main(int argc, char** argv)
 
   std::vector<std::string> prelude
   {
-    "(define fib (lambda (n) (cond (<= n 1) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(fib 10)"
+    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))"
   };
 
   for (const auto& each : prelude)
   {
-    std::cerr << lisp::evaluate(each) << "\n\n";
+    lisp::evaluate(each);
+    std::cout << "\n\n";
   }
 
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
-    std::cout << lisp::evaluate(buffer) << "\n\n";
+    const auto begin {std::chrono::high_resolution_clock::now()};
+    #ifndef NDEBUG
+    lisp::evaluate(buffer);
+    #else
+    std::cout << lisp::evaluate(buffer) << std::flush;
+    #endif // NDEBUG
+    std::cerr << " in "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::high_resolution_clock::now() - begin
+                 ).count()
+              << "ms" << "\n\n";
   }
 
   return boost::exit_success;
