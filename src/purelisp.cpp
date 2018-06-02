@@ -431,11 +431,13 @@ int main(int argc, char** argv)
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
     const auto begin {std::chrono::high_resolution_clock::now()};
-    // #ifndef NDEBUG
-    // lisp::evaluate(buffer);
-    // #else
+
+    #ifndef NDEBUG
+                 lisp::evaluate(buffer);
+    #else
     std::cout << lisp::evaluate(buffer) << std::flush;
-    // #endif // NDEBUG
+    #endif // NDEBUG
+
     std::cerr << " in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::high_resolution_clock::now() - begin
