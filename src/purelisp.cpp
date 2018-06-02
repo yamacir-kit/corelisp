@@ -6,7 +6,6 @@
 #include <locale>
 #include <map>
 #include <numeric>
-// #include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -21,34 +20,6 @@
 
 #include <unistd.h>
 #include <sys/ioctl.h>
-
-// #define highwrite(CELL) std::cerr << expr.highlight(CELL) << " " << __LINE__ << std::endl
-// #define highwrite(CELL) std::cerr << std::flush
-//
-//
-// namespace lisp::regex
-// {
-//   auto escape_regex_specials(const std::string& s)
-//     -> std::string
-//   {
-//     auto buffer {s};
-//
-//     static const std::vector<std::string> regex_specials // 多分足りない
-//     {
-//       "\\", "$", "(", ")", "*", "+", ".", "[", "]", "?", "^", "{", "}", "|"
-//     };
-//
-//     for (const auto& special : regex_specials)
-//     {
-//       for (auto pos {buffer.find(special)}; pos != std::string::npos; pos = buffer.find(special, pos + 2))
-//       {
-//         buffer.replace(pos, 1, std::string {"\\"} + special);
-//       }
-//     }
-//
-//     return buffer;
-//   }
-// } // namespace lisp::regex
 
 
 namespace lisp
@@ -115,6 +86,7 @@ namespace lisp
              });
     }
   } static tokenize;
+
 
   class cell
     : public std::vector<cell>
@@ -200,28 +172,6 @@ namespace lisp
         return ostream << expr.value;
       }
     }
-
-    // auto highlight(const std::string& target)
-    // {
-    //   std::stringstream sstream {}, pattern {};
-    //   sstream << *this;
-    //   pattern << "^(.*?[\\s|\\(]?)(" << regex::escape_regex_specials(target) << ")([\\s|\\)].*)$";
-    //   return std::regex_replace(sstream.str(), std::regex {pattern.str()}, "$1\e[31m$2\e[0m$3");
-    // }
-    //
-    // decltype(auto) highlight(const cell& expr)
-    // {
-    //   if (expr.state != type::atom)
-    //   {
-    //     std::stringstream sstream {};
-    //     sstream << expr;
-    //     return highlight(sstream.str());
-    //   }
-    //   else
-    //   {
-    //     return highlight(expr.value);
-    //   }
-    // }
   };
 
 
@@ -289,19 +239,16 @@ namespace lisp
       case cell::type::list:
         if ((*this).find(expr.at(0).value) != std::end(*this))
         {
-          // highwrite(expr[0]);
           const cell buffer {(*this)[expr[0].value](expr, scope)};
           return expr = std::move(buffer);
         }
 
-        // highwrite(expr[0]);
         switch (replace_by_buffered_evaluation(expr[0], scope).state)
         {
         case cell::type::list:
           {
             for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
             {
-              // highwrite(expr.at(index + 1));
               expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
             }
 
@@ -310,9 +257,6 @@ namespace lisp
               expr.closure.emplace(each);
             }
 
-            // highwrite(expr[0].at(2));
-            // return (*this)(expr[0].at(2), expr.closure);
-            // return (*this).replace_by_buffered_evaluation(expr[0].at(2), expr.closure);
             const auto buffer {(*this)(expr[0].at(2), expr.closure)};
             return expr = std::move(buffer);
           }
@@ -321,13 +265,9 @@ namespace lisp
           {
             for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
             {
-              // highwrite(*iter);
               (*this).replace_by_buffered_evaluation(*iter, scope);
             }
 
-            // highwrite(expr[0]);
-            // return (*this)(scope.at(expr[0].value), scope);
-            // return (*this).replace_by_buffered_evaluation(scope.at(expr[0].value), scope);
             const auto buffer {(*this)(scope.at(expr[0].value), scope)};
             return expr = std::move(buffer);
           }
@@ -360,11 +300,9 @@ namespace lisp
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
-        // highwrite(*iter);
         args.emplace_back(evaluate.replace_by_buffered_evaluation(*iter, scope).value);
       }
 
-      // highwrite(expr.at(1));
       const auto result {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
@@ -373,7 +311,6 @@ namespace lisp
       }
       else
       {
-        // return expr = {cell::type::atom, result != 0 ? "true" : "nil"};
         return expr = (result != 0 ? scope.at("true") : scope["nil"]);
       }
     }
@@ -391,27 +328,18 @@ int main(int argc, char** argv)
   evaluate["quote"] = [](auto& expr, auto&)
     -> decltype(auto)
   {
-    // highwrite(expr.at(1));
     return expr.at(1);
   };
 
   evaluate["cond"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // highwrite(expr.at(1));
-    // return evaluate(
-    //          evaluate(expr.at(1), scope) != scope["nil"]
-    //            ? (highwrite(expr.at(2)), expr.at(2))
-    //            : (highwrite(expr.at(3)), expr.at(3)),
-    //          scope
-    //        );
     return evaluate(evaluate(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
   };
 
   evaluate["define"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // highwrite(expr.at(2));
     return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
   };
 
@@ -425,9 +353,7 @@ int main(int argc, char** argv)
   evaluate["atom"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // highwrite(expr.at(1));
     evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
-
     return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
   };
 
@@ -442,10 +368,8 @@ int main(int argc, char** argv)
   {
     cell buffer {};
 
-    // highwrite(expr.at(1));
     buffer.push_back(evaluate(expr.at(1), scope));
 
-    // highwrite(expr.at(2));
     for (const auto& each : evaluate(expr.at(2), scope))
     {
       buffer.push_back(each);
@@ -457,7 +381,6 @@ int main(int argc, char** argv)
   evaluate["car"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // highwrite(expr.at(1));
     const auto buffer {evaluate(expr.at(1), scope).at(0)};
     return expr = std::move(buffer);
   };
@@ -465,7 +388,6 @@ int main(int argc, char** argv)
   evaluate["cdr"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // highwrite(expr.at(1));
     auto buffer {evaluate(expr.at(1), scope)};
     buffer.erase(std::begin(buffer));
     return expr = std::move(buffer);
