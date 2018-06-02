@@ -6,20 +6,24 @@
 #include <locale>
 #include <map>
 #include <numeric>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/scope_exit.hpp>
 
+#ifndef NDEBUG
+#include <sstream>
+#include <thread>
+
 #include <unistd.h>
 #include <sys/ioctl.h>
+#endif // NDEBUG
 
 
 namespace lisp
@@ -155,21 +159,21 @@ namespace lisp
       return !((*this) != rhs);
     }
 
-    friend auto operator<<(std::ostream& ostream, const cell& expr)
+    friend auto operator<<(std::ostream& os, const cell& expr)
       -> std::ostream&
     {
       switch (expr.state)
       {
       case type::list:
-        ostream <<  "(";
+        os <<  '(';
         for (const auto& each : expr)
         {
-          ostream << each << (&each != &expr.back() ? " " : "");
+          os << each << (&each != &expr.back() ? " " : "");
         }
-        return ostream << ")";
+        return os << ')';
 
       default:
-        return ostream << expr.value;
+        return os << expr.value;
       }
     }
   };
@@ -185,7 +189,7 @@ namespace lisp
     cell buffer_;
 
     #ifndef NDEBUG
-    static inline std::size_t previous_lines {0};
+    static inline std::size_t previous_row {0};
     struct winsize window_size;
     #endif // NDEBUG
 
@@ -208,25 +212,32 @@ namespace lisp
       {
         ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
 
-        if (0 < previous_lines)
+        std::stringstream ss {};
+        ss << buffer_;
+
+        if (0 < previous_row)
         {
-          for (std::size_t row {previous_lines}; 0 < row; --row)
+          for (auto row {previous_row}; 0 < row; --row)
           {
             std::cerr << "\r\e[K\e[A";
           }
         }
 
-        std::stringstream ss {};
-        ss << buffer_;
-
-        previous_lines = std::size(ss.str()) / window_size.ws_col;
+        previous_row = std::size(ss.str()) / window_size.ws_col;
 
         if (std::size(ss.str()) % window_size.ws_col == 0)
         {
-          ++previous_lines;
+          --previous_row;
         }
 
-        std::cerr << "\r\e[K" << buffer_ << std::flush;
+        auto serialized {ss.str()};
+
+        if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
+        {
+          serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
+        }
+
+        std::cerr << "\r\e[K" << serialized << std::flush;
         std::this_thread::sleep_for(std::chrono::milliseconds {10});
       };
       #endif // NDEBUG
@@ -278,7 +289,9 @@ namespace lisp
     }
     catch (const std::exception& ex)
     {
+      #ifndef NDEBUG
       std::cerr << "(runtime_error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
+      #endif // NDEBUG
       return expr = scope["nil"];
     }
 
@@ -418,11 +431,11 @@ int main(int argc, char** argv)
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
     const auto begin {std::chrono::high_resolution_clock::now()};
-    #ifndef NDEBUG
-    lisp::evaluate(buffer);
-    #else
+    // #ifndef NDEBUG
+    // lisp::evaluate(buffer);
+    // #else
     std::cout << lisp::evaluate(buffer) << std::flush;
-    #endif // NDEBUG
+    // #endif // NDEBUG
     std::cerr << " in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::high_resolution_clock::now() - begin
