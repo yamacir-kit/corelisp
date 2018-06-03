@@ -1,3 +1,7 @@
+#ifndef NDEBUG
+#define VISUALIZE_DEFORMATION_PROCESS
+#endif // NDEBUG
+
 #include <algorithm>
 #include <chrono>
 #include <functional>
@@ -15,15 +19,17 @@
 
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/scope_exit.hpp>
 
-#ifndef NDEBUG
+#ifdef VISUALIZE_DEFORMATION_PROCESS
+#include <chrono>
 #include <sstream>
 #include <thread>
 
+#include <boost/scope_exit.hpp>
+
 #include <unistd.h>
 #include <sys/ioctl.h>
-#endif // NDEBUG
+#endif // VISUALIZE_DEFORMATION_PROCESS
 
 
 namespace lisp
@@ -188,10 +194,10 @@ namespace lisp
 
     cell buffer_;
 
-    #ifndef NDEBUG
+    #ifdef VISUALIZE_DEFORMATION_PROCESS
     static inline std::size_t previous_row {0};
     struct winsize window_size;
-    #endif // NDEBUG
+    #endif // VISUALIZE_DEFORMATION_PROCESS
 
   public:
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
@@ -207,7 +213,7 @@ namespace lisp
 
     cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope) try
     {
-      #ifndef NDEBUG
+      #ifdef VISUALIZE_DEFORMATION_PROCESS
       BOOST_SCOPE_EXIT_ALL(this)
       {
         ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
@@ -240,7 +246,7 @@ namespace lisp
         std::cerr << "\r\e[K" << serialized << std::flush;
         std::this_thread::sleep_for(std::chrono::milliseconds {10});
       };
-      #endif // NDEBUG
+      #endif // VISUALIZE_DEFORMATION_PROCESS
 
       switch (expr.state)
       {
@@ -416,15 +422,18 @@ int main(int argc, char** argv)
   evaluate[">"]  = numeric_procedure<cpp_dec_float_100, std::greater> {};
   evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
 
-  std::vector<std::string> prelude
+  std::vector<std::string> predefined
   {
-    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))"
+    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
+    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))"
   };
 
-  for (const auto& each : prelude)
+  for (const auto& each : predefined)
   {
     lisp::evaluate(each);
-    std::cout << "\n\n";
+    #ifdef VISUALIZE_DEFORMATION_PROCESS
+    std::cerr << "\r\e[K";
+    #endif // VISUALIZE_DEFORMATION_PROCESS
   }
 
   std::vector<std::string> history {};
@@ -432,11 +441,10 @@ int main(int argc, char** argv)
   {
     const auto begin {std::chrono::high_resolution_clock::now()};
 
-    #ifndef NDEBUG
+    #ifndef VISUALIZE_DEFORMATION_PROCESS
+    std::cout <<
+    #endif // VISUALIZE_DEFORMATION_PROCESS
                  lisp::evaluate(buffer);
-    #else
-    std::cout << lisp::evaluate(buffer) << std::flush;
-    #endif // NDEBUG
 
     std::cerr << " in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(
