@@ -1,7 +1,9 @@
 #ifndef NDEBUG
 #define VISUALIZE_DEFORMATION_PROCESS
-#define VISUALIZE_PROCESSING_TIME
 #endif // NDEBUG
+
+#define VISUALIZE_PROCESSING_TIME
+
 
 #include <algorithm>
 #include <functional>
@@ -20,6 +22,7 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
+
 #ifdef VISUALIZE_DEFORMATION_PROCESS
 #include <chrono>
 #include <sstream>
@@ -31,6 +34,7 @@
 #include <sys/ioctl.h>
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
+
 #ifdef VISUALIZE_PROCESSING_TIME
 #include <chrono>
 #endif // VISUALIZE_PROCESSING_TIME
@@ -41,7 +45,8 @@ namespace lisp
   class tokenizer
     : public std::vector<std::string>
   {
-    static decltype(auto) tokenize_(const std::string& s)
+    static auto tokenize_(const std::string& s)
+      -> std::vector<std::string>
     {
       std::vector<std::string> buffer {};
 
@@ -51,7 +56,7 @@ namespace lisp
         iter += std::size(buffer.back());
       }
 
-      return buffer;
+      return buffer; // copy elision
     }
 
   public:
@@ -61,7 +66,7 @@ namespace lisp
     {}
 
     tokenizer(const std::string& s)
-      : std::vector<std::string> {std::move(tokenize_(s))}
+      : std::vector<std::string> {tokenize_(s)} // copy elision
     {}
 
     auto& operator()(const std::string& s)
@@ -81,7 +86,7 @@ namespace lisp
 
   protected:
     template <typename CharType>
-    static constexpr bool is_round_brackets(CharType&& c)
+    static constexpr bool is_round_brackets(CharType c) noexcept
     {
       return c == '(' || c == ')';
     }
@@ -217,7 +222,7 @@ namespace lisp
 
     cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope)
     {
-      buffer_ = expr;
+      std::swap(buffer_, expr);
       return operator()(buffer_, scope);
     }
 
@@ -458,13 +463,13 @@ int main(int argc, char** argv)
     #endif // VISUALIZE_DEFORMATION_PROCESS
                  lisp::evaluate(buffer);
 
+    #ifdef VISUALIZE_PROCESSING_TIME
+    const auto end {std::chrono::high_resolution_clock::now()};
+    #endif // VISUALIZE_PROCESSING_TIME
+
     std::cerr <<
     #ifdef VISUALIZE_PROCESSING_TIME
-                 " in "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::high_resolution_clock::now() - begin
-                 ).count()
-              << "ms" <<
+                 " in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" <<
     #endif // VISUALIZE_PROCESSING_TIME
                  "\n\n";
   }
