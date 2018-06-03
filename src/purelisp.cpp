@@ -1,9 +1,9 @@
 #ifndef NDEBUG
 #define VISUALIZE_DEFORMATION_PROCESS
+#define VISUALIZE_PROCESSING_TIME
 #endif // NDEBUG
 
 #include <algorithm>
-#include <chrono>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -30,6 +30,10 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #endif // VISUALIZE_DEFORMATION_PROCESS
+
+#ifdef VISUALIZE_PROCESSING_TIME
+#include <chrono>
+#endif // VISUALIZE_PROCESSING_TIME
 
 
 namespace lisp
@@ -439,18 +443,24 @@ int main(int argc, char** argv)
   std::vector<std::string> history {};
   for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
+    #ifdef VISUALIZE_PROCESSING_TIME
     const auto begin {std::chrono::high_resolution_clock::now()};
+    #endif // VISUALIZE_PROCESSING_TIME
 
     #ifndef VISUALIZE_DEFORMATION_PROCESS
     std::cout <<
     #endif // VISUALIZE_DEFORMATION_PROCESS
                  lisp::evaluate(buffer);
 
-    std::cerr << " in "
+    std::cerr <<
+    #ifdef VISUALIZE_PROCESSING_TIME
+                 " in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::high_resolution_clock::now() - begin
                  ).count()
-              << "ms" << "\n\n";
+              << "ms" <<
+    #endif // VISUALIZE_PROCESSING_TIME
+                 "\n\n";
   }
 
   return boost::exit_success;
