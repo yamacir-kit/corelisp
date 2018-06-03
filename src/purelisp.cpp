@@ -6,6 +6,7 @@
 
 
 #include <algorithm>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -20,6 +21,7 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
 
@@ -157,7 +159,7 @@ namespace lisp
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
-    bool operator!=(const cell& rhs)
+    bool operator!=(const cell& rhs) const noexcept
     {
       if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       {
@@ -177,7 +179,7 @@ namespace lisp
 
     bool operator==(const cell& rhs)
     {
-      return !((*this) != rhs);
+      return !(*this != rhs);
     }
 
     friend auto operator<<(std::ostream& os, const cell& expr)
@@ -203,7 +205,7 @@ namespace lisp
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type dynamic_scope {
+    static inline cell::scope_type dynamic_scope_ {
       {"true", cell {cell::type::atom, "true"}}
     };
 
@@ -215,18 +217,18 @@ namespace lisp
     #endif // VISUALIZE_DEFORMATION_PROCESS
 
   public:
-    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
+    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
       return operator()(cell {s}, scope);
     }
 
-    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope)
+    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope_)
     {
       std::swap(buffer_, expr);
       return operator()(buffer_, scope);
     }
 
-    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope) try
+    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
     {
       #ifdef VISUALIZE_DEFORMATION_PROCESS
       BOOST_SCOPE_EXIT_ALL(this)
@@ -269,7 +271,7 @@ namespace lisp
         return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
       case cell::type::list:
-        if ((*this).find(expr.at(0).value) != std::end(*this))
+        if (find(expr.at(0).value) != std::end(*this)) // special forms
         {
           const cell buffer {(*this)[expr[0].value](expr, scope)};
           return expr = std::move(buffer);
@@ -316,7 +318,7 @@ namespace lisp
       return expr = scope["nil"];
     }
 
-    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope)
+    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope_)
     {
       const auto buffer {(*this)(expr, scope)};
       return expr = std::move(buffer);
@@ -347,6 +349,35 @@ namespace lisp
       {
         return expr = (result != 0 ? scope.at("true") : scope["nil"]);
       }
+    }
+  };
+
+  template <typename T>
+  class numeric_type
+  {
+  public:
+    using value_type = T;
+
+  private:
+    value_type data_;
+
+  public:
+    numeric_type(value_type data)
+      : data_ {data}
+    {}
+
+    numeric_type(const std::string& s)
+      : data_ {boost::lexical_cast<value_type>(s)}
+    {}
+
+    const auto str() const
+    {
+      return boost::lexical_cast<std::string>(data_);
+    }
+
+    operator value_type() const noexcept
+    {
+      return data_;
     }
   };
 } // namespace lisp
@@ -427,15 +458,15 @@ int main(int argc, char** argv)
     return expr = std::move(buffer);
   };
 
-  evaluate["+"]  = numeric_procedure<cpp_dec_float_100, std::plus> {};
-  evaluate["-"]  = numeric_procedure<cpp_dec_float_100, std::minus> {};
-  evaluate["*"]  = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
-  evaluate["/"]  = numeric_procedure<cpp_dec_float_100, std::divides> {};
-  evaluate["="]  = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
-  evaluate["<"]  = numeric_procedure<cpp_dec_float_100, std::less> {};
-  evaluate["<="] = numeric_procedure<cpp_dec_float_100, std::less_equal> {};
-  evaluate[">"]  = numeric_procedure<cpp_dec_float_100, std::greater> {};
-  evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
+  evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
+  evaluate["-"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::minus> {};
+  evaluate["*"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::multiplies> {};
+  evaluate["/"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::divides> {};
+  evaluate["="]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::equal_to> {};
+  evaluate["<"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less> {};
+  evaluate["<="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less_equal> {};
+  evaluate[">"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater> {};
+  evaluate[">="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater_equal> {};
 
   std::vector<std::string> predefined
   {
