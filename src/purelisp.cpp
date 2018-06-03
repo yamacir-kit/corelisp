@@ -123,7 +123,7 @@ namespace lisp
 
     std::string value;
 
-    using scope_type = std::map<std::string, lisp::cell>;
+    using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
     scope_type closure;
 
   public:
@@ -211,11 +211,6 @@ namespace lisp
 
     cell buffer_;
 
-    #ifdef VISUALIZE_DEFORMATION_PROCESS
-    static inline std::size_t previous_row {0};
-    struct winsize window_size;
-    #endif // VISUALIZE_DEFORMATION_PROCESS
-
   public:
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
@@ -231,38 +226,7 @@ namespace lisp
     cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
     {
       #ifdef VISUALIZE_DEFORMATION_PROCESS
-      BOOST_SCOPE_EXIT_ALL(this)
-      {
-        ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
-
-        std::stringstream ss {};
-        ss << buffer_;
-
-        if (0 < previous_row)
-        {
-          for (auto row {previous_row}; 0 < row; --row)
-          {
-            std::cerr << "\r\e[K\e[A";
-          }
-        }
-
-        previous_row = std::size(ss.str()) / window_size.ws_col;
-
-        if (std::size(ss.str()) % window_size.ws_col == 0)
-        {
-          --previous_row;
-        }
-
-        auto serialized {ss.str()};
-
-        if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
-        {
-          serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
-        }
-
-        std::cerr << "\r\e[K" << serialized << std::flush;
-        std::this_thread::sleep_for(std::chrono::milliseconds {10});
-      };
+      BOOST_SCOPE_EXIT_ALL(this) { rewrite_expression(); };
       #endif // VISUALIZE_DEFORMATION_PROCESS
 
       switch (expr.state)
@@ -322,6 +286,42 @@ namespace lisp
     {
       const auto buffer {(*this)(expr, scope)};
       return expr = std::move(buffer);
+    }
+
+  private:
+    void rewrite_expression() const
+    {
+      static struct winsize window_size;
+      ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
+
+      static std::size_t previous_row {0};
+      if (0 < previous_row)
+      {
+        for (auto row {previous_row}; 0 < row; --row)
+        {
+          std::cerr << "\r\e[K\e[A";
+        }
+      }
+
+      std::stringstream ss {};
+      ss << buffer_;
+
+      previous_row = std::size(ss.str()) / window_size.ws_col;
+
+      if (std::size(ss.str()) % window_size.ws_col == 0)
+      {
+        --previous_row;
+      }
+
+      auto serialized {ss.str()};
+
+      if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
+      {
+        serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
+      }
+
+      std::cerr << "\r\e[K" << serialized << std::flush;
+      std::this_thread::sleep_for(std::chrono::milliseconds {10});
     }
   } static evaluate;
 
