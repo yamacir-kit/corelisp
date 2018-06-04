@@ -289,6 +289,7 @@ namespace lisp
     }
 
   private:
+    #ifdef VISUALIZE_DEFORMATION_PROCESS
     void rewrite_expression() const
     {
       static struct winsize window_size;
@@ -321,8 +322,9 @@ namespace lisp
       }
 
       std::cerr << "\r\e[K" << serialized << std::flush;
-      std::this_thread::sleep_for(std::chrono::milliseconds {10});
+      std::this_thread::sleep_for(std::chrono::milliseconds {100});
     }
+    #endif // VISUALIZE_DEFORMATION_PROCESS
   } static evaluate;
 
 
@@ -446,16 +448,18 @@ int main(int argc, char** argv)
   evaluate["car"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    const auto buffer {evaluate(expr.at(1), scope).at(0)};
-    return expr = std::move(buffer);
+    // const auto buffer {evaluate(expr.at(1), scope).at(0)};
+    // return expr = std::move(buffer);
+    return evaluate(expr.at(1), scope).at(0);
   };
 
   evaluate["cdr"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
     auto buffer {evaluate(expr.at(1), scope)};
-    buffer.erase(std::begin(buffer));
-    return expr = std::move(buffer);
+    // buffer.erase(std::begin(buffer));
+    // return expr = std::move(buffer);
+    return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
   };
 
   evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
@@ -471,7 +475,9 @@ int main(int argc, char** argv)
   std::vector<std::string> predefined
   {
     "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))"
+    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
+    "(define map (lambda (func e) (cond (eq e nil) nil (cons (func (car e)) (map func (cdr e))))))",
+    "(define x (quote (1 2 3 4 5)))"
   };
 
   for (const auto& each : predefined)
