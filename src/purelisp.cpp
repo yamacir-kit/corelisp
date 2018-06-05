@@ -1,9 +1,10 @@
 #ifndef NDEBUG
 #define VISUALIZE_DEFORMATION_PROCESS
-#define VISUALIZE_PROCESSING_TIME
 #endif // NDEBUG
 
+
 #include <algorithm>
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -18,7 +19,9 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+
 
 #ifdef VISUALIZE_DEFORMATION_PROCESS
 #include <chrono>
@@ -31,6 +34,8 @@
 #include <sys/ioctl.h>
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
+
+#define VISUALIZE_PROCESSING_TIME
 #ifdef VISUALIZE_PROCESSING_TIME
 #include <chrono>
 #endif // VISUALIZE_PROCESSING_TIME
@@ -41,32 +46,33 @@ namespace lisp
   class tokenizer
     : public std::vector<std::string>
   {
-  public:
-    tokenizer() = default;
-
-    template <typename... Ts>
-    tokenizer(Ts&&... args)
+    static auto tokenize_(const std::string& s)
+      -> std::vector<std::string>
     {
-      (*this).operator()(std::forward<Ts>(args)...);
-    }
-
-    auto& operator()(const std::string& s)
-    {
-      clear();
+      std::vector<std::string> buffer {};
 
       for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
       {
-        emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
-        iter += std::size(back());
+        buffer.emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
+        iter += std::size(buffer.back());
       }
 
-      return *this;
+      return buffer; // copy elision
     }
 
-    template <typename T>
-    static constexpr bool is_round_brackets(T&& c)
+  public:
+    template <typename... Ts>
+    tokenizer(Ts&&... args)
+      : std::vector<std::string> {std::forward<Ts>(args)...}
+    {}
+
+    tokenizer(const std::string& s)
+      : std::vector<std::string> {tokenize_(s)} // copy elision
+    {}
+
+    auto& operator()(const std::string& s)
     {
-      return c == '(' || c == ')';
+      return *this = std::move(tokenize_(s));
     }
 
     friend auto operator<<(std::ostream& os, tokenizer& tokens)
@@ -80,6 +86,12 @@ namespace lisp
     }
 
   protected:
+    template <typename CharType>
+    static constexpr bool is_round_brackets(CharType c) noexcept
+    {
+      return c == '(' || c == ')';
+    }
+
     template <typename InputIterator>
     static constexpr auto find_token_begin(InputIterator first, InputIterator last)
       -> InputIterator
@@ -110,7 +122,7 @@ namespace lisp
 
     std::string value;
 
-    using scope_type = std::map<std::string, lisp::cell>;
+    using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
     scope_type closure;
 
   public:
@@ -118,7 +130,13 @@ namespace lisp
       : state {state}, value {value}
     {}
 
-    template <typename InputIterator>
+    template <typename InputIterator,
+              typename = typename std::enable_if<
+                                    std::is_nothrow_constructible<
+                                      decltype(value),
+                                      typename std::remove_reference<InputIterator>::type::value_type
+                                    >::value
+                                  >::type>
     cell(InputIterator&& first, InputIterator&& last)
       : state {type::list}
     {
@@ -146,7 +164,7 @@ namespace lisp
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
-    bool operator!=(const cell& rhs)
+    bool operator!=(const cell& rhs) const noexcept
     {
       if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       {
@@ -166,7 +184,7 @@ namespace lisp
 
     bool operator==(const cell& rhs)
     {
-      return !((*this) != rhs);
+      return !(*this != rhs);
     }
 
     friend auto operator<<(std::ostream& os, const cell& expr)
@@ -192,64 +210,28 @@ namespace lisp
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type dynamic_scope {
+    static inline cell::scope_type dynamic_scope_ {
       {"true", cell {cell::type::atom, "true"}}
     };
 
     cell buffer_;
 
-    #ifdef VISUALIZE_DEFORMATION_PROCESS
-    static inline std::size_t previous_row {0};
-    struct winsize window_size;
-    #endif // VISUALIZE_DEFORMATION_PROCESS
-
   public:
-    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope)
+    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
       return operator()(cell {s}, scope);
     }
 
-    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope)
+    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope_)
     {
-      buffer_ = expr;
+      std::swap(buffer_, expr);
       return operator()(buffer_, scope);
     }
 
-    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope) try
+    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
     {
       #ifdef VISUALIZE_DEFORMATION_PROCESS
-      BOOST_SCOPE_EXIT_ALL(this)
-      {
-        ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
-
-        std::stringstream ss {};
-        ss << buffer_;
-
-        if (0 < previous_row)
-        {
-          for (auto row {previous_row}; 0 < row; --row)
-          {
-            std::cerr << "\r\e[K\e[A";
-          }
-        }
-
-        previous_row = std::size(ss.str()) / window_size.ws_col;
-
-        if (std::size(ss.str()) % window_size.ws_col == 0)
-        {
-          --previous_row;
-        }
-
-        auto serialized {ss.str()};
-
-        if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
-        {
-          serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
-        }
-
-        std::cerr << "\r\e[K" << serialized << std::flush;
-        std::this_thread::sleep_for(std::chrono::milliseconds {10});
-      };
+      BOOST_SCOPE_EXIT_ALL(this) { rewrite_expression(); };
       #endif // VISUALIZE_DEFORMATION_PROCESS
 
       switch (expr.state)
@@ -258,7 +240,7 @@ namespace lisp
         return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
 
       case cell::type::list:
-        if ((*this).find(expr.at(0).value) != std::end(*this))
+        if (find(expr.at(0).value) != std::end(*this)) // special forms
         {
           const cell buffer {(*this)[expr[0].value](expr, scope)};
           return expr = std::move(buffer);
@@ -305,11 +287,49 @@ namespace lisp
       return expr = scope["nil"];
     }
 
-    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope)
+    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope_)
     {
       const auto buffer {(*this)(expr, scope)};
       return expr = std::move(buffer);
     }
+
+  private:
+    #ifdef VISUALIZE_DEFORMATION_PROCESS
+    void rewrite_expression() const
+    {
+      static struct winsize window_size;
+      ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
+
+      static std::size_t previous_row {0};
+      if (0 < previous_row)
+      {
+        for (auto row {previous_row}; 0 < row; --row)
+        {
+          std::cerr << "\r\e[K\e[A";
+        }
+      }
+
+      std::stringstream ss {};
+      ss << buffer_;
+
+      previous_row = std::size(ss.str()) / window_size.ws_col;
+
+      if (std::size(ss.str()) % window_size.ws_col == 0)
+      {
+        --previous_row;
+      }
+
+      auto serialized {ss.str()};
+
+      if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
+      {
+        serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
+      }
+
+      std::cerr << "\r\e[K" << serialized << std::flush;
+      std::this_thread::sleep_for(std::chrono::milliseconds {10});
+    }
+    #endif // VISUALIZE_DEFORMATION_PROCESS
   } static evaluate;
 
 
@@ -336,6 +356,35 @@ namespace lisp
       {
         return expr = (result != 0 ? scope.at("true") : scope["nil"]);
       }
+    }
+  };
+
+  template <typename T>
+  class numeric_type
+  {
+  public:
+    using value_type = T;
+
+  private:
+    value_type data_;
+
+  public:
+    numeric_type(value_type data)
+      : data_ {data}
+    {}
+
+    numeric_type(const std::string& s)
+      : data_ {boost::lexical_cast<value_type>(s)}
+    {}
+
+    const auto str() const
+    {
+      return boost::lexical_cast<std::string>(data_);
+    }
+
+    operator value_type() const noexcept
+    {
+      return data_;
     }
   };
 } // namespace lisp
@@ -404,32 +453,32 @@ int main(int argc, char** argv)
   evaluate["car"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    const auto buffer {evaluate(expr.at(1), scope).at(0)};
-    return expr = std::move(buffer);
+    return evaluate(expr.at(1), scope).at(0);
   };
 
   evaluate["cdr"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
     auto buffer {evaluate(expr.at(1), scope)};
-    buffer.erase(std::begin(buffer));
-    return expr = std::move(buffer);
+    return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
   };
 
-  evaluate["+"]  = numeric_procedure<cpp_dec_float_100, std::plus> {};
-  evaluate["-"]  = numeric_procedure<cpp_dec_float_100, std::minus> {};
-  evaluate["*"]  = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
-  evaluate["/"]  = numeric_procedure<cpp_dec_float_100, std::divides> {};
-  evaluate["="]  = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
-  evaluate["<"]  = numeric_procedure<cpp_dec_float_100, std::less> {};
-  evaluate["<="] = numeric_procedure<cpp_dec_float_100, std::less_equal> {};
-  evaluate[">"]  = numeric_procedure<cpp_dec_float_100, std::greater> {};
-  evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
+  evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
+  evaluate["-"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::minus> {};
+  evaluate["*"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::multiplies> {};
+  evaluate["/"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::divides> {};
+  evaluate["="]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::equal_to> {};
+  evaluate["<"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less> {};
+  evaluate["<="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less_equal> {};
+  evaluate[">"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater> {};
+  evaluate[">="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater_equal> {};
 
   std::vector<std::string> predefined
   {
     "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))"
+    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
+    "(define map (lambda (func e) (cond (eq e nil) nil (cons (func (car e)) (map func (cdr e))))))",
+    "(define x (quote (1 2 3 4 5)))"
   };
 
   for (const auto& each : predefined)
@@ -454,11 +503,10 @@ int main(int argc, char** argv)
 
     std::cerr <<
     #ifdef VISUALIZE_PROCESSING_TIME
-                 " in "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::high_resolution_clock::now() - begin
-                 ).count()
-              << "ms" <<
+                 " in " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::high_resolution_clock::now() - begin
+                           ).count()
+              << "msec" <<
     #endif // VISUALIZE_PROCESSING_TIME
                  "\n\n";
   }
