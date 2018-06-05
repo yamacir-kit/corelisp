@@ -2,8 +2,6 @@
 #define VISUALIZE_DEFORMATION_PROCESS
 #endif // NDEBUG
 
-#define VISUALIZE_PROCESSING_TIME
-
 
 #include <algorithm>
 #include <deque>
@@ -37,6 +35,7 @@
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
 
+#define VISUALIZE_PROCESSING_TIME
 #ifdef VISUALIZE_PROCESSING_TIME
 #include <chrono>
 #endif // VISUALIZE_PROCESSING_TIME
@@ -131,7 +130,13 @@ namespace lisp
       : state {state}, value {value}
     {}
 
-    template <typename InputIterator>
+    template <typename InputIterator,
+              typename = typename std::enable_if<
+                                    std::is_nothrow_constructible<
+                                      decltype(value),
+                                      typename std::remove_reference<InputIterator>::type::value_type
+                                    >::value
+                                  >::type>
     cell(InputIterator&& first, InputIterator&& last)
       : state {type::list}
     {
@@ -322,7 +327,7 @@ namespace lisp
       }
 
       std::cerr << "\r\e[K" << serialized << std::flush;
-      std::this_thread::sleep_for(std::chrono::milliseconds {100});
+      std::this_thread::sleep_for(std::chrono::milliseconds {10});
     }
     #endif // VISUALIZE_DEFORMATION_PROCESS
   } static evaluate;
@@ -448,8 +453,6 @@ int main(int argc, char** argv)
   evaluate["car"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    // const auto buffer {evaluate(expr.at(1), scope).at(0)};
-    // return expr = std::move(buffer);
     return evaluate(expr.at(1), scope).at(0);
   };
 
@@ -457,8 +460,6 @@ int main(int argc, char** argv)
     -> decltype(auto)
   {
     auto buffer {evaluate(expr.at(1), scope)};
-    // buffer.erase(std::begin(buffer));
-    // return expr = std::move(buffer);
     return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
   };
 
@@ -500,13 +501,12 @@ int main(int argc, char** argv)
     #endif // VISUALIZE_DEFORMATION_PROCESS
                  lisp::evaluate(buffer);
 
-    #ifdef VISUALIZE_PROCESSING_TIME
-    const auto end {std::chrono::high_resolution_clock::now()};
-    #endif // VISUALIZE_PROCESSING_TIME
-
     std::cerr <<
     #ifdef VISUALIZE_PROCESSING_TIME
-                 " in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" <<
+                 " in " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::high_resolution_clock::now() - begin
+                           ).count()
+              << "msec" <<
     #endif // VISUALIZE_PROCESSING_TIME
                  "\n\n";
   }
