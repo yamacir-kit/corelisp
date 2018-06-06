@@ -19,9 +19,10 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/iterator/zip_iterator.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/tti/has_member_function.hpp>
+#include <boost/tuple/tuple.hpp>
 
 
 #ifdef VISUALIZE_DEFORMATION_PROCESS
@@ -176,9 +177,19 @@ namespace lisp
         return true;
       }
 
-      for (std::size_t index {0}; index < std::size(*this); ++index)
+      auto zip_begin = [](auto&&... args) constexpr
       {
-        if ((*this)[index] != rhs[index]) // (std::size(*this) == std::size(rhs)) == true
+        return boost::make_zip_iterator(boost::make_tuple(std::begin(args)...));
+      };
+
+      auto zip_end = [](auto&&... args) constexpr
+      {
+        return boost::make_zip_iterator(boost::make_tuple(std::end(args)...));
+      };
+
+      for(auto iter {zip_begin(*this, rhs)}; iter != zip_end(*this, rhs); ++iter)
+      {
+        if (boost::get<0>(*iter) != boost::get<1>(*iter))
         {
           return true;
         }
@@ -302,10 +313,11 @@ namespace lisp
       case cell::type::list:
         if (find(expr.at(0).value) != std::end(*this)) // special forms
         {
-          return expr = {(*this)[expr[0].value](expr, scope)};
+          // return expr = {(*this)[std::begin(expr)->value](expr, scope)};
+          return (*this)[std::begin(expr)->value](expr, scope);
         }
 
-        switch (expr[0] = {(*this)(expr[0], scope)}; expr[0].state)
+        switch (*std::begin(expr) = {(*this)(*std::begin(expr), scope)}; std::begin(expr)->state)
         {
         case cell::type::list:
           for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
@@ -326,7 +338,8 @@ namespace lisp
             *iter = {(*this)(*iter, scope)};
           }
 
-          return expr = {(*this)(scope.at(expr[0].value), scope)};
+          // return expr = {(*this)(scope.at(std::begin(expr)->value), scope)};
+          return (*this)(scope.at(expr[0].value), scope);
         }
       }
 
@@ -398,8 +411,6 @@ namespace lisp
   } static evaluate;
 
 
-  BOOST_TTI_HAS_MEMBER_FUNCTION(str)
-
   template <typename T, template <typename...> typename BinaryOperator,
             typename = typename std::enable_if<
                                   std::is_constructible<
@@ -419,7 +430,7 @@ namespace lisp
     {
       std::vector<T> args {};
 
-      for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+      for (auto iter {std::next(std::begin(expr), 1)}; iter != std::end(expr); ++iter)
       {
         args.emplace_back(evaluate(*iter, scope).value);
       }
@@ -436,6 +447,7 @@ namespace lisp
       }
     }
   };
+
 
   template <typename T>
   class numeric_type
