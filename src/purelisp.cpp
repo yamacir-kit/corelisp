@@ -407,8 +407,9 @@ namespace lisp
                                   >::value
                                 >::type,
             typename = typename std::enable_if<
-                                  has_member_function_str<
-                                    typename std::add_const<cell::value_type>::type (T::*)(void) const
+                                  std::is_same< // TODO なんか気に入らない
+                                    decltype(boost::lexical_cast<cell::value_type>(std::declval<T>())),
+                                    cell::value_type
                                   >::value
                                 >::type>
   class numeric_procedure
@@ -427,7 +428,7 @@ namespace lisp
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
-        return expr = {cell::type::atom, buffer.str()};
+        return expr = {cell::type::atom, boost::lexical_cast<cell::value_type>(buffer)};
       }
       else
       {
@@ -439,27 +440,32 @@ namespace lisp
   template <typename T>
   class numeric_type
   {
+    std::string data_;
+
   public:
     using value_type = T;
-    value_type data;
+    value_type value;
 
   public:
-    numeric_type(value_type data)
-      : data {data}
+    numeric_type(value_type value)
+      : data_ {boost::lexical_cast<decltype(data_)>(value)},
+        value {value}
     {}
 
-    numeric_type(const std::string& s)
-      : data {boost::lexical_cast<value_type>(s)}
+    numeric_type(const std::string& data)
+      : data_ {data},
+        value {boost::lexical_cast<value_type>(data_)}
     {}
 
-    const auto str() const
+    const auto& str() const noexcept
     {
-      return boost::lexical_cast<std::string>(data);
+      return data_;
     }
 
+    // XXX 多分こいつのおかげでlexical-castable
     operator value_type() const noexcept
     {
-      return data;
+      return value;
     }
   };
 } // namespace lisp
@@ -472,15 +478,15 @@ int main(int argc, char** argv)
   using namespace lisp;
   using namespace boost::multiprecision;
 
-  evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
-  evaluate["-"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::minus> {};
-  evaluate["*"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::multiplies> {};
-  evaluate["/"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::divides> {};
-  evaluate["="]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::equal_to> {};
-  evaluate["<"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less> {};
-  evaluate["<="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::less_equal> {};
-  evaluate[">"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater> {};
-  evaluate[">="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater_equal> {};
+  evaluate["+"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::plus> {};
+  evaluate["-"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::minus> {};
+  evaluate["*"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::multiplies> {};
+  evaluate["/"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::divides> {};
+  evaluate["="]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::equal_to> {};
+  evaluate["<"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::less> {};
+  evaluate["<="] = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::less_equal> {};
+  evaluate[">"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::greater> {};
+  evaluate[">="] = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::greater_equal> {};
 
   std::vector<std::string> tests
   {
