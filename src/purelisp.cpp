@@ -21,6 +21,7 @@
 #include <boost/cstdlib.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/tti/has_member_function.hpp>
 
 
 #ifdef VISUALIZE_DEFORMATION_PROCESS
@@ -120,7 +121,8 @@ namespace lisp
   public:
     enum class type { list, atom } state;
 
-    std::string value;
+    using value_type = std::string;
+    value_type value;
 
     using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
     scope_type closure;
@@ -333,7 +335,19 @@ namespace lisp
   } static evaluate;
 
 
-  template <typename T, template <typename...> typename BinaryOperator>
+  BOOST_TTI_HAS_MEMBER_FUNCTION(str)
+
+  template <typename T, template <typename...> typename BinaryOperator,
+            typename = typename std::enable_if<
+                                  std::is_constructible<
+                                    T, typename std::add_lvalue_reference<cell::value_type>::type
+                                  >::value
+                                >::type,
+            typename = typename std::enable_if<
+                                  has_member_function_str<
+                                    typename std::add_const<cell::value_type>::type (T::*)(void) const
+                                  >::value
+                                >::type>
   class numeric_procedure
   {
   public:
@@ -346,15 +360,15 @@ namespace lisp
         args.emplace_back(evaluate.replace_by_buffered_evaluation(*iter, scope).value);
       }
 
-      const auto result {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
+      const auto buffer {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
-        return expr = {cell::type::atom, result.str()};
+        return expr = {cell::type::atom, buffer.str()};
       }
       else
       {
-        return expr = (result != 0 ? scope.at("true") : scope["nil"]);
+        return expr = (buffer != 0 ? scope.at("true") : scope["nil"]);
       }
     }
   };
