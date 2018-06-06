@@ -302,42 +302,31 @@ namespace lisp
       case cell::type::list:
         if (find(expr.at(0).value) != std::end(*this)) // special forms
         {
-          // const cell buffer {(*this)[expr[0].value](expr, scope)};
-          // return expr = std::move(buffer);
           return expr = {(*this)[expr[0].value](expr, scope)};
         }
 
-        // switch (replace_by_buffered_evaluation(expr[0], scope).state)
         switch (expr[0] = {(*this)(expr[0], scope)}; expr[0].state)
         {
         case cell::type::list:
+          for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
           {
-            for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
-            {
-              expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
-            }
-
-            for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
-            {
-              expr.closure.emplace(each);
-            }
-
-            // const auto buffer {(*this)(expr[0].at(2), expr.closure)};
-            // return expr = std::move(buffer);
-            return expr = {(*this)(expr[0].at(2), expr.closure)};
+            expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
           }
+
+          for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
+          {
+            expr.closure.emplace(each);
+          }
+
+          return expr = {(*this)(expr[0].at(2), expr.closure)};
 
         case cell::type::atom:
+          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
           {
-            for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-            {
-              *iter = {(*this)(*iter, scope)};
-            }
-
-            // const auto buffer {(*this)(scope.at(expr[0].value), scope)};
-            // return expr = std::move(buffer);
-            return expr = {(*this)(scope.at(expr[0].value), scope)};
+            *iter = {(*this)(*iter, scope)};
           }
+
+          return expr = {(*this)(scope.at(expr[0].value), scope)};
         }
       }
 
@@ -351,18 +340,13 @@ namespace lisp
       return expr = scope["nil"];
     }
 
-    [[deprecated]] cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope_)
-    {
-      const auto buffer {(*this)(expr, scope)};
-      return expr = std::move(buffer);
-    }
-
   protected:
     static cell& quote(cell& expr, cell::scope_type&) noexcept(false)
     {
       return expr.at(1);
     }
 
+    // TODO 静的スコープモードと動的スコープモードを切り替えられるように
     static cell& lambda(cell& expr, cell::scope_type& scope) noexcept(false)
     {
       expr.closure = scope;
@@ -487,73 +471,6 @@ int main(int argc, char** argv)
 
   using namespace lisp;
   using namespace boost::multiprecision;
-
-  // evaluate["quote"] = [](auto& expr, auto&)
-  //   -> decltype(auto)
-  // {
-  //   return expr.at(1);
-  // };
-
-  // evaluate["cond"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   return evaluate(evaluate(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
-  // };
-  //
-  // evaluate["define"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
-  // };
-
-  // evaluate["lambda"] = [](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   expr.closure = scope;
-  //   return expr;
-  // };
-
-  // evaluate["atom"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   // evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
-  //   const auto& buffer {evaluate(expr.at(1), scope)};
-  //   return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
-  // };
-
-  // evaluate["eq"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
-  // };
-
-  // evaluate["cons"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   cell buffer {};
-  //
-  //   buffer.push_back(evaluate(expr.at(1), scope));
-  //
-  //   for (const auto& each : evaluate(expr.at(2), scope))
-  //   {
-  //     buffer.push_back(each);
-  //   }
-  //
-  //   return expr = std::move(buffer);
-  // };
-  //
-  // evaluate["car"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   return evaluate(expr.at(1), scope).at(0);
-  // };
-  //
-  // evaluate["cdr"] = [&](auto& expr, auto& scope)
-  //   -> decltype(auto)
-  // {
-  //   auto buffer {evaluate(expr.at(1), scope)};
-  //   return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
-  // };
 
   evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
   evaluate["-"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::minus> {};
