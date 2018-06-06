@@ -228,7 +228,54 @@ namespace lisp
           {"lambda", &lisp::evaluator::lambda},
           {"eq", &lisp::evaluator::eq}
         }
-    {}
+    {
+      (*this)["cond"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        return (*this)((*this)(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
+      };
+
+      (*this)["define"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        return scope[expr.at(1).value] = (*this)(expr.at(2), scope);
+      };
+
+      (*this)["atom"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        const auto& buffer {(*this)(expr.at(1), scope)};
+        return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
+      };
+
+      (*this)["cons"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        cell buffer {};
+
+        buffer.push_back((*this)(expr.at(1), scope));
+
+        for (const auto& each : (*this)(expr.at(2), scope))
+        {
+          buffer.push_back(each);
+        }
+
+        return expr = std::move(buffer);
+      };
+
+      (*this)["car"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        return (*this)(expr.at(1), scope).at(0);
+      };
+
+      (*this)["cdr"] = [this](auto& expr, auto& scope)
+        -> decltype(auto)
+      {
+        auto buffer {(*this)(expr.at(1), scope)};
+        return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
+      };
+    }
 
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
@@ -447,17 +494,17 @@ int main(int argc, char** argv)
   //   return expr.at(1);
   // };
 
-  evaluate["cond"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    return evaluate(evaluate(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
-  };
-
-  evaluate["define"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
-  };
+  // evaluate["cond"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   return evaluate(evaluate(expr.at(1), scope) != scope["nil"] ? expr.at(2) : expr.at(3), scope);
+  // };
+  //
+  // evaluate["define"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
+  // };
 
   // evaluate["lambda"] = [](auto& expr, auto& scope)
   //   -> decltype(auto)
@@ -466,13 +513,13 @@ int main(int argc, char** argv)
   //   return expr;
   // };
 
-  evaluate["atom"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    // evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
-    const auto& buffer {evaluate(expr.at(1), scope)};
-    return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
-  };
+  // evaluate["atom"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   // evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
+  //   const auto& buffer {evaluate(expr.at(1), scope)};
+  //   return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
+  // };
 
   // evaluate["eq"] = [&](auto& expr, auto& scope)
   //   -> decltype(auto)
@@ -480,33 +527,33 @@ int main(int argc, char** argv)
   //   return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
   // };
 
-  evaluate["cons"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    cell buffer {};
-
-    buffer.push_back(evaluate(expr.at(1), scope));
-
-    for (const auto& each : evaluate(expr.at(2), scope))
-    {
-      buffer.push_back(each);
-    }
-
-    return expr = std::move(buffer);
-  };
-
-  evaluate["car"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    return evaluate(expr.at(1), scope).at(0);
-  };
-
-  evaluate["cdr"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    auto buffer {evaluate(expr.at(1), scope)};
-    return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
-  };
+  // evaluate["cons"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   cell buffer {};
+  //
+  //   buffer.push_back(evaluate(expr.at(1), scope));
+  //
+  //   for (const auto& each : evaluate(expr.at(2), scope))
+  //   {
+  //     buffer.push_back(each);
+  //   }
+  //
+  //   return expr = std::move(buffer);
+  // };
+  //
+  // evaluate["car"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   return evaluate(expr.at(1), scope).at(0);
+  // };
+  //
+  // evaluate["cdr"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   auto buffer {evaluate(expr.at(1), scope)};
+  //   return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : scope["nil"]);
+  // };
 
   evaluate["+"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::plus> {};
   evaluate["-"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::minus> {};
