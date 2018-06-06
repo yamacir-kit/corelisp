@@ -244,11 +244,13 @@ namespace lisp
       case cell::type::list:
         if (find(expr.at(0).value) != std::end(*this)) // special forms
         {
-          const cell buffer {(*this)[expr[0].value](expr, scope)};
-          return expr = std::move(buffer);
+          // const cell buffer {(*this)[expr[0].value](expr, scope)};
+          // return expr = std::move(buffer);
+          return expr = {(*this)[expr[0].value](expr, scope)};
         }
 
-        switch (replace_by_buffered_evaluation(expr[0], scope).state)
+        // switch (replace_by_buffered_evaluation(expr[0], scope).state)
+        switch (expr[0] = {(*this)(expr[0], scope)}; expr[0].state)
         {
         case cell::type::list:
           {
@@ -262,19 +264,21 @@ namespace lisp
               expr.closure.emplace(each);
             }
 
-            const auto buffer {(*this)(expr[0].at(2), expr.closure)};
-            return expr = std::move(buffer);
+            // const auto buffer {(*this)(expr[0].at(2), expr.closure)};
+            // return expr = std::move(buffer);
+            return expr = {(*this)(expr[0].at(2), expr.closure)};
           }
 
         case cell::type::atom:
           {
             for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
             {
-              (*this).replace_by_buffered_evaluation(*iter, scope);
+              *iter = {(*this)(*iter, scope)};
             }
 
-            const auto buffer {(*this)(scope.at(expr[0].value), scope)};
-            return expr = std::move(buffer);
+            // const auto buffer {(*this)(scope.at(expr[0].value), scope)};
+            // return expr = std::move(buffer);
+            return expr = {(*this)(scope.at(expr[0].value), scope)};
           }
         }
       }
@@ -289,7 +293,7 @@ namespace lisp
       return expr = scope["nil"];
     }
 
-    cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope_)
+    [[deprecated]] cell& replace_by_buffered_evaluation(cell& expr, cell::scope_type& scope = dynamic_scope_)
     {
       const auto buffer {(*this)(expr, scope)};
       return expr = std::move(buffer);
@@ -357,7 +361,7 @@ namespace lisp
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
-        args.emplace_back(evaluate.replace_by_buffered_evaluation(*iter, scope).value);
+        args.emplace_back(evaluate(*iter, scope).value);
       }
 
       const auto buffer {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
@@ -378,27 +382,25 @@ namespace lisp
   {
   public:
     using value_type = T;
-
-  private:
-    value_type data_;
+    value_type data;
 
   public:
     numeric_type(value_type data)
-      : data_ {data}
+      : data {data}
     {}
 
     numeric_type(const std::string& s)
-      : data_ {boost::lexical_cast<value_type>(s)}
+      : data {boost::lexical_cast<value_type>(s)}
     {}
 
     const auto str() const
     {
-      return boost::lexical_cast<std::string>(data_);
+      return boost::lexical_cast<std::string>(data);
     }
 
     operator value_type() const noexcept
     {
-      return data_;
+      return data;
     }
   };
 } // namespace lisp
@@ -439,8 +441,9 @@ int main(int argc, char** argv)
   evaluate["atom"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
-    return expr[1].state != cell::type::atom && std::size(expr.at(1)) != 0 ? scope["nil"] : scope["true"];
+    // evaluate.replace_by_buffered_evaluation(expr.at(1), scope);
+    const auto& buffer {evaluate(expr.at(1), scope)};
+    return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
   };
 
   evaluate["eq"] = [&](auto& expr, auto& scope)
@@ -487,7 +490,7 @@ int main(int argc, char** argv)
   evaluate[">"]  = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater> {};
   evaluate[">="] = numeric_procedure</* cpp_dec_float_100 */ numeric_type<int>, std::greater_equal> {};
 
-  std::vector<std::string> predefined
+  std::vector<std::string> tests
   {
     "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
     "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
@@ -495,7 +498,7 @@ int main(int argc, char** argv)
     "(define x (quote (1 2 3 4 5)))"
   };
 
-  for (const auto& each : predefined)
+  for (const auto& each : tests)
   {
     lisp::evaluate(each);
     #ifdef VISUALIZE_DEFORMATION_PROCESS
