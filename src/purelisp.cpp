@@ -124,6 +124,9 @@ namespace lisp
     using value_type = std::string;
     value_type value;
 
+    // TODO
+    // std::less<void>指定によって文字列リテラルから
+    // std::stringの一時オブジェクトが生成されなくなるらしいが本当にそうなのか検証
     using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
     scope_type closure;
 
@@ -213,12 +216,20 @@ namespace lisp
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
     static inline cell::scope_type dynamic_scope_ {
-      {"true", cell {cell::type::atom, "true"}}
+      {"true", cell {cell::type::atom, "true"}},
     };
 
     cell buffer_;
 
   public:
+    evaluator()
+      : std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>> {
+          {"quote", &lisp::evaluator::quote},
+          {"lambda", &lisp::evaluator::lambda},
+          {"eq", &lisp::evaluator::eq}
+        }
+    {}
+
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
       return operator()(cell {s}, scope);
@@ -297,6 +308,23 @@ namespace lisp
     {
       const auto buffer {(*this)(expr, scope)};
       return expr = std::move(buffer);
+    }
+
+  protected:
+    static cell& quote(cell& expr, cell::scope_type&) noexcept(false)
+    {
+      return expr.at(1);
+    }
+
+    static cell& lambda(cell& expr, cell::scope_type& scope) noexcept(false)
+    {
+      expr.closure = scope;
+      return expr;
+    }
+
+    static cell& eq(cell& expr, cell::scope_type& scope) noexcept(false)
+    {
+      return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
     }
 
   private:
@@ -413,11 +441,11 @@ int main(int argc, char** argv)
   using namespace lisp;
   using namespace boost::multiprecision;
 
-  evaluate["quote"] = [](auto& expr, auto&)
-    -> decltype(auto)
-  {
-    return expr.at(1);
-  };
+  // evaluate["quote"] = [](auto& expr, auto&)
+  //   -> decltype(auto)
+  // {
+  //   return expr.at(1);
+  // };
 
   evaluate["cond"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
@@ -431,12 +459,12 @@ int main(int argc, char** argv)
     return scope[expr.at(1).value] = evaluate(expr.at(2), scope);
   };
 
-  evaluate["lambda"] = [](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    expr.closure = scope;
-    return expr;
-  };
+  // evaluate["lambda"] = [](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   expr.closure = scope;
+  //   return expr;
+  // };
 
   evaluate["atom"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
@@ -446,11 +474,11 @@ int main(int argc, char** argv)
     return buffer.state != cell::type::atom && std::size(buffer) != 0 ? scope["nil"] : scope["true"];
   };
 
-  evaluate["eq"] = [&](auto& expr, auto& scope)
-    -> decltype(auto)
-  {
-    return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
-  };
+  // evaluate["eq"] = [&](auto& expr, auto& scope)
+  //   -> decltype(auto)
+  // {
+  //   return expr.at(1) != expr.at(2) ? scope["nil"] : scope["true"];
+  // };
 
   evaluate["cons"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
