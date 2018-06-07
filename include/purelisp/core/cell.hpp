@@ -117,7 +117,7 @@ namespace purelisp
         return os << expr.value;
       }
     }
-  };
+  } static nil, true_ {cell::type::atom, "true"};
 } // namespace purelisp
 
 
