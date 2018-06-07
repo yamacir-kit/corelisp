@@ -14,7 +14,9 @@
 #include <purelisp/core/tokenizer.hpp>
 
 
-namespace purelisp::core
+namespace purelisp
+{
+inline namespace core
 {
   class cell
     : public std::vector<cell>
@@ -117,8 +119,9 @@ namespace purelisp::core
         return os << expr.value;
       }
     }
-  } static nil, true_ {cell::type::atom, "true"};
-} // namespace purelisp::core
+  } static true_ {cell::type::atom, "true"}, false_;
+} // inline namespace core
+} // namespace purelisp
 
 
 #endif // INCLUDED_PURELISP_CORE_CELL_HPP

@@ -1,9 +1,7 @@
 #include <chrono>
 #include <iostream>
-#include <iterator>
 #include <string>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
@@ -22,7 +20,6 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
-  using namespace purelisp::core;
   using namespace purelisp;
   using namespace boost::multiprecision;
 
@@ -40,7 +37,7 @@ int main(int argc, char** argv)
   {
     "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
     "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
-    "(define map (lambda (func e) (cond (eq e nil) nil (cons (func (car e)) (map func (cdr e))))))",
+    "(define map (lambda (func e) (cond (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
     "(define x (quote (1 2 3 4 5)))"
   };
 

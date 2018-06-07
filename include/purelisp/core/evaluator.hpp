@@ -24,13 +24,15 @@
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
 
-namespace purelisp::core
+namespace purelisp
+{
+inline namespace core
 {
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
     static inline cell::scope_type dynamic_scope_ {
-      {"true", cell {cell::type::atom, "true"}},
+      {"true", true_}, {"false", false_}
     };
 
     cell buffer_;
@@ -46,7 +48,7 @@ namespace purelisp::core
       (*this)["cond"] = [this](auto& expr, auto& scope)
         -> decltype(auto)
       {
-        return (*this)((*this)(expr.at(1), scope) != nil ? expr.at(2) : expr.at(3), scope);
+        return (*this)((*this)(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
       };
 
       (*this)["define"] = [this](auto& expr, auto& scope)
@@ -60,7 +62,7 @@ namespace purelisp::core
         -> decltype(auto)
       {
         const auto& buffer {(*this)(expr.at(1), scope)};
-        return buffer.state != cell::type::atom && std::size(buffer) != 0 ? nil : scope["true"];
+        return buffer.state != cell::type::atom && std::size(buffer) != 0 ? false_ : true_;
       };
 
       (*this)["cons"] = [this](auto& expr, auto& scope)
@@ -88,7 +90,7 @@ namespace purelisp::core
         -> decltype(auto)
       {
         auto buffer {(*this)(expr.at(1), scope)};
-        return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : nil);
+        return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : false_);
       };
     }
 
@@ -159,7 +161,7 @@ namespace purelisp::core
       #ifndef NDEBUG
       std::cerr << "(runtime_error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
       #endif // NDEBUG
-      return nil;
+      return false_;
     }
 
   protected:
@@ -177,10 +179,8 @@ namespace purelisp::core
 
     static cell& eq(cell& expr, cell::scope_type& scope) noexcept(false)
     {
-      return expr.at(1) != expr.at(2) ? nil : scope["true"];
+      return expr.at(1) != expr.at(2) ? false_ : true_;
     }
-
-  private:
   } static evaluate;
 
 
@@ -220,6 +220,7 @@ namespace purelisp::core
     std::this_thread::sleep_for(std::chrono::milliseconds {10});
   }
   #endif // VISUALIZE_DEFORMATION_PROCESS
+} // inline namespace core
 } // namespace purelisp
 
 
