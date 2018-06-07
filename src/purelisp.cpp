@@ -4,7 +4,6 @@
 
 
 #include <algorithm>
-#include <deque>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -17,13 +16,14 @@
 #include <utility>
 #include <vector>
 
-#include <boost/container/flat_map.hpp>
+// #include <boost/container/flat_map.hpp>
 #include <boost/cstdlib.hpp>
-#include <boost/iterator/zip_iterator.hpp>
+// #include <boost/iterator/zip_iterator.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/tuple/tuple.hpp>
+// #include <boost/tuple/tuple.hpp>
 
+#include <purelisp/core/cell.hpp>
 #include <purelisp/core/tokenizer.hpp>
 
 
@@ -47,183 +47,112 @@
 
 namespace purelisp
 {
-  // class tokenizer
-  //   : public std::vector<std::string>
+  // class cell
+  //   : public std::vector<cell>
   // {
-  //   static auto tokenize_(const std::string& s)
-  //     -> std::vector<std::string>
-  //   {
-  //     std::vector<std::string> buffer {};
+  // public:
+  //   enum class type { list, atom } state;
   //
-  //     for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
-  //     {
-  //       buffer.emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
-  //       iter += std::size(buffer.back());
-  //     }
+  //   using value_type = std::string;
+  //   value_type value;
   //
-  //     return buffer; // copy elision
-  //   }
+  //   // TODO
+  //   // std::less<void>指定によって文字列リテラルから
+  //   // std::stringの一時オブジェクトが生成されなくなるらしいが本当にそうなのか検証
+  //   // using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
+  //   using scope_type = boost::container::flat_map<std::string, cell, std::less<void>>;
+  //   scope_type closure;
   //
   // public:
-  //   template <typename... Ts>
-  //   tokenizer(Ts&&... args)
-  //     : std::vector<std::string> {std::forward<Ts>(args)...}
+  //   cell(type state = type::list, const std::string& value = "")
+  //     : state {state}, value {value}
   //   {}
   //
-  //   tokenizer(const std::string& s)
-  //     : std::vector<std::string> {tokenize_(s)} // copy elision
-  //   {}
-  //
-  //   auto& operator()(const std::string& s)
+  //   template <typename InputIterator,
+  //             typename = typename std::enable_if<
+  //                                   std::is_nothrow_constructible<
+  //                                     decltype(value),
+  //                                     typename std::remove_reference<InputIterator>::type::value_type
+  //                                   >::value
+  //                                 >::type>
+  //   cell(InputIterator&& first, InputIterator&& last)
+  //     : state {type::list}
   //   {
-  //     return *this = std::move(tokenize_(s));
+  //     if (std::distance(first, last) != 0)
+  //     {
+  //       if (*first == "(")
+  //       {
+  //         while (++first != last && *first != ")")
+  //         {
+  //           emplace_back(first, last);
+  //         }
+  //       }
+  //       else
+  //       {
+  //         *this = {type::atom, *first};
+  //       }
+  //     }
   //   }
   //
-  //   friend auto operator<<(std::ostream& os, tokenizer& tokens)
+  //   explicit cell(const tokenizer& tokens)
+  //     : cell {std::begin(tokens), std::end(tokens)}
+  //   {}
+  //
+  //   cell(tokenizer&& tokens)
+  //     : cell {std::begin(tokens), std::end(tokens)}
+  //   {}
+  //
+  //   bool operator!=(const cell& rhs) const noexcept
+  //   {
+  //     if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
+  //     {
+  //       return true;
+  //     }
+  //
+  //     auto zip_begin = [](auto&&... args) constexpr
+  //     {
+  //       return boost::make_zip_iterator(boost::make_tuple(std::begin(args)...));
+  //     };
+  //
+  //     auto zip_end = [](auto&&... args) constexpr
+  //     {
+  //       return boost::make_zip_iterator(boost::make_tuple(std::end(args)...));
+  //     };
+  //
+  //     for(auto iter {zip_begin(*this, rhs)}; iter != zip_end(*this, rhs); ++iter)
+  //     {
+  //       if (boost::get<0>(*iter) != boost::get<1>(*iter))
+  //       {
+  //         return true;
+  //       }
+  //     }
+  //
+  //     return false;
+  //   }
+  //
+  //   bool operator==(const cell& rhs)
+  //   {
+  //     return !(*this != rhs);
+  //   }
+  //
+  //   friend auto operator<<(std::ostream& os, const cell& expr)
   //     -> std::ostream&
   //   {
-  //     for (const auto& each : tokens)
+  //     switch (expr.state)
   //     {
-  //       os << each << (&each != &tokens.back() ? ", " : "");
+  //     case type::list:
+  //       os <<  '(';
+  //       for (const auto& each : expr)
+  //       {
+  //         os << each << (&each != &expr.back() ? " " : "");
+  //       }
+  //       return os << ')';
+  //
+  //     default:
+  //       return os << expr.value;
   //     }
-  //     return os;
   //   }
-  //
-  // protected:
-  //   template <typename CharType>
-  //   static constexpr bool is_round_brackets(CharType c) noexcept
-  //   {
-  //     return c == '(' || c == ')';
-  //   }
-  //
-  //   template <typename InputIterator>
-  //   static constexpr auto find_token_begin(InputIterator first, InputIterator last)
-  //     -> InputIterator
-  //   {
-  //     return std::find_if(first, last, [](auto c)
-  //            {
-  //              return std::isgraph(c);
-  //            });
-  //   }
-  //
-  //   template <typename InputIterator>
-  //   static constexpr auto find_token_end(InputIterator first, InputIterator last)
-  //     -> InputIterator
-  //   {
-  //     return std::find_if(first, last, [](auto c)
-  //            {
-  //              return is_round_brackets(c) || std::isspace(c);
-  //            });
-  //   }
-  // } static tokenize;
-
-
-  class cell
-    : public std::vector<cell>
-  {
-  public:
-    enum class type { list, atom } state;
-
-    using value_type = std::string;
-    value_type value;
-
-    // TODO
-    // std::less<void>指定によって文字列リテラルから
-    // std::stringの一時オブジェクトが生成されなくなるらしいが本当にそうなのか検証
-    // using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
-    using scope_type = boost::container::flat_map<std::string, cell, std::less<void>>;
-    scope_type closure;
-
-  public:
-    cell(type state = type::list, const std::string& value = "")
-      : state {state}, value {value}
-    {}
-
-    template <typename InputIterator,
-              typename = typename std::enable_if<
-                                    std::is_nothrow_constructible<
-                                      decltype(value),
-                                      typename std::remove_reference<InputIterator>::type::value_type
-                                    >::value
-                                  >::type>
-    cell(InputIterator&& first, InputIterator&& last)
-      : state {type::list}
-    {
-      if (std::distance(first, last) != 0)
-      {
-        if (*first == "(")
-        {
-          while (++first != last && *first != ")")
-          {
-            emplace_back(first, last);
-          }
-        }
-        else
-        {
-          *this = {type::atom, *first};
-        }
-      }
-    }
-
-    explicit cell(const tokenizer& tokens)
-      : cell {std::begin(tokens), std::end(tokens)}
-    {}
-
-    cell(tokenizer&& tokens)
-      : cell {std::begin(tokens), std::end(tokens)}
-    {}
-
-    bool operator!=(const cell& rhs) const noexcept
-    {
-      if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
-      {
-        return true;
-      }
-
-      auto zip_begin = [](auto&&... args) constexpr
-      {
-        return boost::make_zip_iterator(boost::make_tuple(std::begin(args)...));
-      };
-
-      auto zip_end = [](auto&&... args) constexpr
-      {
-        return boost::make_zip_iterator(boost::make_tuple(std::end(args)...));
-      };
-
-      for(auto iter {zip_begin(*this, rhs)}; iter != zip_end(*this, rhs); ++iter)
-      {
-        if (boost::get<0>(*iter) != boost::get<1>(*iter))
-        {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
-    bool operator==(const cell& rhs)
-    {
-      return !(*this != rhs);
-    }
-
-    friend auto operator<<(std::ostream& os, const cell& expr)
-      -> std::ostream&
-    {
-      switch (expr.state)
-      {
-      case type::list:
-        os <<  '(';
-        for (const auto& each : expr)
-        {
-          os << each << (&each != &expr.back() ? " " : "");
-        }
-        return os << ')';
-
-      default:
-        return os << expr.value;
-      }
-    }
-  };
+  // };
 
 
   class evaluator
