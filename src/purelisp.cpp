@@ -24,6 +24,8 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/tuple/tuple.hpp>
 
+#include <purelisp/core/tokenizer.hpp>
+
 
 #ifdef VISUALIZE_DEFORMATION_PROCESS
 #include <chrono>
@@ -43,77 +45,77 @@
 #endif // VISUALIZE_PROCESSING_TIME
 
 
-namespace lisp
+namespace purelisp
 {
-  class tokenizer
-    : public std::vector<std::string>
-  {
-    static auto tokenize_(const std::string& s)
-      -> std::vector<std::string>
-    {
-      std::vector<std::string> buffer {};
-
-      for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
-      {
-        buffer.emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
-        iter += std::size(buffer.back());
-      }
-
-      return buffer; // copy elision
-    }
-
-  public:
-    template <typename... Ts>
-    tokenizer(Ts&&... args)
-      : std::vector<std::string> {std::forward<Ts>(args)...}
-    {}
-
-    tokenizer(const std::string& s)
-      : std::vector<std::string> {tokenize_(s)} // copy elision
-    {}
-
-    auto& operator()(const std::string& s)
-    {
-      return *this = std::move(tokenize_(s));
-    }
-
-    friend auto operator<<(std::ostream& os, tokenizer& tokens)
-      -> std::ostream&
-    {
-      for (const auto& each : tokens)
-      {
-        os << each << (&each != &tokens.back() ? ", " : "");
-      }
-      return os;
-    }
-
-  protected:
-    template <typename CharType>
-    static constexpr bool is_round_brackets(CharType c) noexcept
-    {
-      return c == '(' || c == ')';
-    }
-
-    template <typename InputIterator>
-    static constexpr auto find_token_begin(InputIterator first, InputIterator last)
-      -> InputIterator
-    {
-      return std::find_if(first, last, [](auto c)
-             {
-               return std::isgraph(c);
-             });
-    }
-
-    template <typename InputIterator>
-    static constexpr auto find_token_end(InputIterator first, InputIterator last)
-      -> InputIterator
-    {
-      return std::find_if(first, last, [](auto c)
-             {
-               return is_round_brackets(c) || std::isspace(c);
-             });
-    }
-  } static tokenize;
+  // class tokenizer
+  //   : public std::vector<std::string>
+  // {
+  //   static auto tokenize_(const std::string& s)
+  //     -> std::vector<std::string>
+  //   {
+  //     std::vector<std::string> buffer {};
+  //
+  //     for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
+  //     {
+  //       buffer.emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
+  //       iter += std::size(buffer.back());
+  //     }
+  //
+  //     return buffer; // copy elision
+  //   }
+  //
+  // public:
+  //   template <typename... Ts>
+  //   tokenizer(Ts&&... args)
+  //     : std::vector<std::string> {std::forward<Ts>(args)...}
+  //   {}
+  //
+  //   tokenizer(const std::string& s)
+  //     : std::vector<std::string> {tokenize_(s)} // copy elision
+  //   {}
+  //
+  //   auto& operator()(const std::string& s)
+  //   {
+  //     return *this = std::move(tokenize_(s));
+  //   }
+  //
+  //   friend auto operator<<(std::ostream& os, tokenizer& tokens)
+  //     -> std::ostream&
+  //   {
+  //     for (const auto& each : tokens)
+  //     {
+  //       os << each << (&each != &tokens.back() ? ", " : "");
+  //     }
+  //     return os;
+  //   }
+  //
+  // protected:
+  //   template <typename CharType>
+  //   static constexpr bool is_round_brackets(CharType c) noexcept
+  //   {
+  //     return c == '(' || c == ')';
+  //   }
+  //
+  //   template <typename InputIterator>
+  //   static constexpr auto find_token_begin(InputIterator first, InputIterator last)
+  //     -> InputIterator
+  //   {
+  //     return std::find_if(first, last, [](auto c)
+  //            {
+  //              return std::isgraph(c);
+  //            });
+  //   }
+  //
+  //   template <typename InputIterator>
+  //   static constexpr auto find_token_end(InputIterator first, InputIterator last)
+  //     -> InputIterator
+  //   {
+  //     return std::find_if(first, last, [](auto c)
+  //            {
+  //              return is_round_brackets(c) || std::isspace(c);
+  //            });
+  //   }
+  // } static tokenize;
 
 
   class cell
@@ -129,7 +131,7 @@ namespace lisp
     // std::less<void>指定によって文字列リテラルから
     // std::stringの一時オブジェクトが生成されなくなるらしいが本当にそうなのか検証
     // using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
-    using scope_type = boost::container::flat_map<std::string, lisp::cell, std::less<void>>;
+    using scope_type = boost::container::flat_map<std::string, cell, std::less<void>>;
     scope_type closure;
 
   public:
@@ -236,9 +238,9 @@ namespace lisp
   public:
     evaluator()
       : std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>> {
-          {"quote", &lisp::evaluator::quote},
-          {"lambda", &lisp::evaluator::lambda},
-          {"eq", &lisp::evaluator::eq}
+          {"quote",  &purelisp::evaluator::quote},
+          {"lambda", &purelisp::evaluator::lambda},
+          {"eq",     &purelisp::evaluator::eq}
         }
     {
       (*this)["cond"] = [this](auto& expr, auto& scope)
@@ -503,7 +505,7 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
-  using namespace lisp;
+  using namespace purelisp;
   using namespace boost::multiprecision;
 
   evaluate["+"]  = numeric_procedure<cpp_dec_float_100 /* numeric_type<int> */, std::plus> {};
@@ -526,7 +528,7 @@ int main(int argc, char** argv)
 
   for (const auto& each : tests)
   {
-    lisp::evaluate(each);
+    evaluate(each);
     #ifdef VISUALIZE_DEFORMATION_PROCESS
     std::cerr << "\r\e[K";
     #endif // VISUALIZE_DEFORMATION_PROCESS
@@ -542,7 +544,7 @@ int main(int argc, char** argv)
     #ifndef VISUALIZE_DEFORMATION_PROCESS
     std::cout <<
     #endif // VISUALIZE_DEFORMATION_PROCESS
-                 lisp::evaluate(buffer);
+                 evaluate(buffer);
 
     std::cerr <<
     #ifdef VISUALIZE_PROCESSING_TIME
