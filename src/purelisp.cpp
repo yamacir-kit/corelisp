@@ -22,18 +22,19 @@ int main(int argc, char** argv)
 {
   const std::vector<std::string> args {argv + 1, argv + argc};
 
+  using namespace purelisp::core;
   using namespace purelisp;
   using namespace boost::multiprecision;
 
-  evaluate["+"]  = numeric_procedure<cpp_dec_float_100, std::plus> {};
-  evaluate["-"]  = numeric_procedure<cpp_dec_float_100, std::minus> {};
-  evaluate["*"]  = numeric_procedure<cpp_dec_float_100, std::multiplies> {};
-  evaluate["/"]  = numeric_procedure<cpp_dec_float_100, std::divides> {};
-  evaluate["="]  = numeric_procedure<cpp_dec_float_100, std::equal_to> {};
-  evaluate["<"]  = numeric_procedure<cpp_dec_float_100, std::less> {};
-  evaluate["<="] = numeric_procedure<cpp_dec_float_100, std::less_equal> {};
-  evaluate[">"]  = numeric_procedure<cpp_dec_float_100, std::greater> {};
-  evaluate[">="] = numeric_procedure<cpp_dec_float_100, std::greater_equal> {};
+  evaluate["+"]  = arithmetic::function<cpp_dec_float_100, std::plus> {};
+  evaluate["-"]  = arithmetic::function<cpp_dec_float_100, std::minus> {};
+  evaluate["*"]  = arithmetic::function<cpp_dec_float_100, std::multiplies> {};
+  evaluate["/"]  = arithmetic::function<cpp_dec_float_100, std::divides> {};
+  evaluate["="]  = arithmetic::function<cpp_dec_float_100, std::equal_to> {};
+  evaluate["<"]  = arithmetic::function<cpp_dec_float_100, std::less> {};
+  evaluate["<="] = arithmetic::function<cpp_dec_float_100, std::less_equal> {};
+  evaluate[">"]  = arithmetic::function<cpp_dec_float_100, std::greater> {};
+  evaluate[">="] = arithmetic::function<cpp_dec_float_100, std::greater_equal> {};
 
   std::vector<std::string> tests
   {

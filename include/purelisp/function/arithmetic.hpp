@@ -13,31 +13,34 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
+#include <purelisp/core/cell.hpp>
+#include <purelisp/core/evaluator.hpp>
 
-namespace purelisp
+
+namespace purelisp::arithmetic
 {
   template <typename T, template <typename...> typename BinaryOperator,
             typename = typename std::enable_if<
                                   std::is_constructible<
-                                    T, typename std::add_lvalue_reference<cell::value_type>::type
+                                    T, typename std::add_lvalue_reference<core::cell::value_type>::type
                                   >::value
                                 >::type,
             typename = typename std::enable_if<
                                   std::is_same< // TODO なんか気に入らない
-                                    decltype(boost::lexical_cast<cell::value_type>(std::declval<T>())),
-                                    cell::value_type
+                                    decltype(boost::lexical_cast<core::cell::value_type>(std::declval<T>())),
+                                    core::cell::value_type
                                   >::value
                                 >::type>
-  class numeric_procedure
+  class function
   {
   public:
-    cell& operator()(cell& expr, cell::scope_type& scope)
+    core::cell& operator()(core::cell& expr, core::cell::scope_type& scope)
     {
       std::vector<T> args {};
 
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
-        args.emplace_back(evaluate(*iter, scope).value);
+        args.emplace_back(core::evaluate(*iter, scope).value);
       }
 
       const auto buffer {std::accumulate(
@@ -46,13 +49,11 @@ namespace purelisp
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
-        return expr = {cell::type::atom, boost::lexical_cast<cell::value_type>(buffer)};
+        return expr = {core::cell::type::atom, boost::lexical_cast<core::cell::value_type>(buffer)};
       }
       else
       {
-        // return expr = (buffer != 0 ? scope["true"] : scope["nil"]);
-        // return buffer != 0 ? scope["true"] : scope["nil"];
-        return buffer != 0 ? scope["true"] : nil;
+        return buffer != 0 ? scope["true"] : core::nil;
       }
     }
   };
@@ -89,7 +90,7 @@ namespace purelisp
       return value;
     }
   };
-} // namespace purelisp
+} // namespace purelisp::arithmetic
 
 
 #endif // INCLUDED_PURELISP_FUNCTION_ARITHMETIC_HPP

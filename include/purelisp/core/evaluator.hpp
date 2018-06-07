@@ -24,7 +24,7 @@
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
 
-namespace purelisp
+namespace purelisp::core
 {
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
@@ -38,9 +38,9 @@ namespace purelisp
   public:
     evaluator()
       : std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>> {
-          {"quote",  &purelisp::evaluator::quote},
-          {"lambda", &purelisp::evaluator::lambda},
-          {"eq",     &purelisp::evaluator::eq}
+          {"quote",  &purelisp::core::evaluator::quote},
+          {"lambda", &purelisp::core::evaluator::lambda},
+          {"eq",     &purelisp::core::evaluator::eq}
         }
     {
       (*this)["cond"] = [this](auto& expr, auto& scope)

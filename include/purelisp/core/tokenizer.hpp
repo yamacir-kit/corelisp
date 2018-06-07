@@ -10,7 +10,7 @@
 #include <vector>
 
 
-namespace purelisp
+namespace purelisp::core
 {
   class tokenizer
     : public std::vector<std::string>
@@ -82,7 +82,7 @@ namespace purelisp
              });
     }
   } static tokenize;
-} // namespace purelisp
+} // namespace purelisp::core
 
 
 #endif // INCLUDED_PURELISP_CORE_TOKENIZER_HPP
