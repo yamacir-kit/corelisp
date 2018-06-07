@@ -9,7 +9,6 @@
 #include <iostream>
 #include <iterator>
 #include <locale>
-#include <map>
 #include <numeric>
 #include <stdexcept>
 #include <string>
@@ -18,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/container/flat_map.hpp>
 #include <boost/cstdlib.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/lexical_cast.hpp>
@@ -128,7 +128,8 @@ namespace lisp
     // TODO
     // std::less<void>指定によって文字列リテラルから
     // std::stringの一時オブジェクトが生成されなくなるらしいが本当にそうなのか検証
-    using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
+    // using scope_type = std::map<std::string, lisp::cell, std::less<void>>;
+    using scope_type = boost::container::flat_map<std::string, lisp::cell, std::less<void>>;
     scope_type closure;
 
   public:
@@ -249,7 +250,8 @@ namespace lisp
       (*this)["define"] = [this](auto& expr, auto& scope)
         -> decltype(auto)
       {
-        return scope[expr.at(1).value] = (*this)(expr.at(2), scope);
+        scope.emplace(expr.at(1).value, (*this)(expr.at(2), scope));
+        return expr;
       };
 
       (*this)["atom"] = [this](auto& expr, auto& scope)
@@ -308,21 +310,30 @@ namespace lisp
       switch (expr.state)
       {
       case cell::type::atom:
-        return scope.find(expr.value) != std::end(scope) ? scope[expr.value] : expr;
-
-      case cell::type::list:
-        if (find(expr.at(0).value) != std::end(*this)) // special forms
+        if (auto iter {scope.find(expr.value)}; iter != std::end(scope))
         {
-          // return expr = {(*this)[std::begin(expr)->value](expr, scope)};
-          return (*this)[std::begin(expr)->value](expr, scope);
+          return (*iter).second;
+        }
+        else
+        {
+          return expr;
         }
 
-        switch (*std::begin(expr) = {(*this)(*std::begin(expr), scope)}; std::begin(expr)->state)
+      case cell::type::list:
+        if (auto iter {find(expr.at(0).value)}; iter != std::end(*this)) // special forms
+        {
+          return (*iter).second(expr, scope);
+        }
+
+        // switch (*std::begin(expr) = {(*this)(*std::begin(expr), scope)}; std::begin(expr)->state)
+        // switch (expr[0] = {(*this)(*std::begin(expr), scope)}; expr[0].state)
+        switch (expr[0] = (*this)(expr[0], scope); expr[0].state) // こいつはムーブしたらダメ
         {
         case cell::type::list:
           for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
           {
-            expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
+            // expr.closure[expr[0][1].at(index).value] = (*this)(expr.at(index + 1), scope);
+            expr.closure.emplace(expr[0][1].at(index).value, (*this)(expr.at(index + 1), scope));
           }
 
           for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
@@ -330,12 +341,14 @@ namespace lisp
             expr.closure.emplace(each);
           }
 
-          return expr = {(*this)(expr[0].at(2), expr.closure)};
+          // return expr = {(*this)(expr[0].at(2), expr.closure)};
+          return (*this)(expr[0].at(2), expr.closure);
 
         case cell::type::atom:
           for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
           {
-            *iter = {(*this)(*iter, scope)};
+            // *iter = {(*this)(*iter, scope)};
+            *iter = (*this)(*iter, scope);
           }
 
           // return expr = {(*this)(scope.at(std::begin(expr)->value), scope)};
@@ -350,7 +363,7 @@ namespace lisp
       #ifndef NDEBUG
       std::cerr << "(runtime_error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
       #endif // NDEBUG
-      return expr = scope["nil"];
+      return scope["nil"];
     }
 
   protected:
@@ -430,12 +443,14 @@ namespace lisp
     {
       std::vector<T> args {};
 
-      for (auto iter {std::next(std::begin(expr), 1)}; iter != std::end(expr); ++iter)
+      for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
         args.emplace_back(evaluate(*iter, scope).value);
       }
 
-      const auto buffer {std::accumulate(std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {})};
+      const auto buffer {std::accumulate(
+        std::begin(args) + 1, std::end(args), args.front(), BinaryOperator<T> {}
+      )};
 
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
@@ -443,7 +458,8 @@ namespace lisp
       }
       else
       {
-        return expr = (buffer != 0 ? scope.at("true") : scope["nil"]);
+        // return expr = (buffer != 0 ? scope["true"] : scope["nil"]);
+        return buffer != 0 ? scope["true"] : scope["nil"];
       }
     }
   };
