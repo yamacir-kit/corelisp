@@ -24,10 +24,46 @@
 #endif // VISUALIZE_DEFORMATION_PROCESS
 
 
-namespace purelisp
+namespace purelisp { inline namespace core
 {
-inline namespace core
-{
+  #ifdef VISUALIZE_DEFORMATION_PROCESS
+  void rewrite_expression(cell& expr)
+  {
+    static struct winsize window_size;
+    ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
+
+    static std::size_t previous_row {0};
+    if (0 < previous_row)
+    {
+      for (auto row {previous_row}; 0 < row; --row)
+      {
+        std::cerr << "\r\e[K\e[A";
+      }
+    }
+
+    std::stringstream ss {};
+    ss << expr;
+
+    previous_row = std::size(ss.str()) / window_size.ws_col;
+
+    if (std::size(ss.str()) % window_size.ws_col == 0)
+    {
+      --previous_row;
+    }
+
+    auto serialized {ss.str()};
+
+    if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
+    {
+      serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
+    }
+
+    std::cerr << "\r\e[K" << serialized << std::flush;
+    std::this_thread::sleep_for(std::chrono::milliseconds {10});
+  }
+  #endif // VISUALIZE_DEFORMATION_PROCESS
+
+
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
@@ -45,7 +81,7 @@ inline namespace core
           {"eq",     &purelisp::core::evaluator::eq}
         }
     {
-      (*this)["cond"] = [this](auto& expr, auto& scope)
+      (*this)["if"] = [this](auto& expr, auto& scope)
         -> decltype(auto)
       {
         return (*this)((*this)(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
@@ -158,9 +194,7 @@ inline namespace core
     }
     catch (const std::exception& ex)
     {
-      #ifndef NDEBUG
-      std::cerr << "(runtime_error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
-      #endif // NDEBUG
+      std::cerr << "(error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
       return false_;
     }
 
@@ -177,51 +211,12 @@ inline namespace core
       return expr;
     }
 
-    static cell& eq(cell& expr, cell::scope_type& scope) noexcept(false)
+    static cell& eq(cell& expr, cell::scope_type&) noexcept(false)
     {
       return expr.at(1) != expr.at(2) ? false_ : true_;
     }
   } static evaluate;
-
-
-  #ifdef VISUALIZE_DEFORMATION_PROCESS
-  void rewrite_expression(cell& expr) const
-  {
-    static struct winsize window_size;
-    ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
-
-    static std::size_t previous_row {0};
-    if (0 < previous_row)
-    {
-      for (auto row {previous_row}; 0 < row; --row)
-      {
-        std::cerr << "\r\e[K\e[A";
-      }
-    }
-
-    std::stringstream ss {};
-    ss << expr;
-
-    previous_row = std::size(ss.str()) / window_size.ws_col;
-
-    if (std::size(ss.str()) % window_size.ws_col == 0)
-    {
-      --previous_row;
-    }
-
-    auto serialized {ss.str()};
-
-    if (auto column {std::size(ss.str()) / window_size.ws_col}; window_size.ws_row < column)
-    {
-      serialized.erase(0, (column - window_size.ws_row) * window_size.ws_col);
-    }
-
-    std::cerr << "\r\e[K" << serialized << std::flush;
-    std::this_thread::sleep_for(std::chrono::milliseconds {10});
-  }
-  #endif // VISUALIZE_DEFORMATION_PROCESS
-} // inline namespace core
-} // namespace purelisp
+}} // namespace purelisp::core
 
 
 #endif // INCLUDED_PURELISP_CORE_EVALUATOR_HPP

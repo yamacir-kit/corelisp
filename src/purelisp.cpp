@@ -35,9 +35,9 @@ int main(int argc, char** argv)
 
   std::vector<std::string> tests
   {
-    "(define fib (lambda (n) (cond (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    "(define tarai (lambda (x y z) (cond (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
-    "(define map (lambda (func e) (cond (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
+    "(define fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
+    "(define tarai (lambda (x y z) (if (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
+    "(define map (lambda (func e) (if (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
     "(define x (quote (1 2 3 4 5)))"
   };
 
@@ -64,6 +64,8 @@ int main(int argc, char** argv)
                    std::chrono::high_resolution_clock::now() - begin
                  ).count()
               << "msec\n\n";
+
+    break;
   }
 
   return boost::exit_success;
