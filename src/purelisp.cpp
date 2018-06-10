@@ -1,10 +1,12 @@
 #include <chrono>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 #include <boost/cstdlib.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 
 #ifndef NDEBUG
 #define VISUALIZE_DEFORMATION_PROCESS
@@ -23,15 +25,15 @@ int main(int argc, char** argv)
   using namespace purelisp;
   using namespace boost::multiprecision;
 
-  evaluate["+"]  = arithmetic::function<cpp_dec_float_100, std::plus> {};
-  evaluate["-"]  = arithmetic::function<cpp_dec_float_100, std::minus> {};
-  evaluate["*"]  = arithmetic::function<cpp_dec_float_100, std::multiplies> {};
-  evaluate["/"]  = arithmetic::function<cpp_dec_float_100, std::divides> {};
-  evaluate["="]  = arithmetic::function<cpp_dec_float_100, std::equal_to> {};
-  evaluate["<"]  = arithmetic::function<cpp_dec_float_100, std::less> {};
-  evaluate["<="] = arithmetic::function<cpp_dec_float_100, std::less_equal> {};
-  evaluate[">"]  = arithmetic::function<cpp_dec_float_100, std::greater> {};
-  evaluate[">="] = arithmetic::function<cpp_dec_float_100, std::greater_equal> {};
+  evaluate["+"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::plus> {};
+  evaluate["-"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::minus> {};
+  evaluate["*"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::multiplies> {};
+  evaluate["/"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::divides> {};
+  evaluate["="]  = arithmetic::function</* cpp_dec_float_100 */ int, std::equal_to> {};
+  evaluate["<"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::less> {};
+  evaluate["<="] = arithmetic::function</* cpp_dec_float_100 */ int, std::less_equal> {};
+  evaluate[">"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::greater> {};
+  evaluate[">="] = arithmetic::function</* cpp_dec_float_100 */ int, std::greater_equal> {};
 
   std::vector<std::string> tests
   {

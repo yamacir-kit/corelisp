@@ -4,10 +4,10 @@
 
 #include <functional>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <stdexcept>
 
 #include <purelisp/core/cell.hpp>
 
@@ -165,7 +165,7 @@ namespace purelisp { inline namespace core
           return (*iter).second(expr, scope);
         }
 
-        switch (auto function {(*this)(expr[0], scope)}; function.state)
+        switch (auto& function {(*this)(expr[0], scope)}; function.state)
         {
         case cell::type::list:
           {
@@ -173,7 +173,8 @@ namespace purelisp { inline namespace core
 
             for (std::size_t index {0}; index < std::size(function.at(1)); ++index)
             {
-              closure.emplace(function.at(1).at(index).value, (*this)(expr.at(index + 1), scope));
+              // closure.emplace(function.at(1).at(index).value, (*this)(expr.at(index + 1), scope));
+              closure[function.at(1).at(index).value] = (*this)(expr.at(index + 1), scope);
             }
 
             for (const auto& each : scope)
@@ -203,7 +204,6 @@ namespace purelisp { inline namespace core
       return expr.at(1);
     }
 
-    // TODO 静的スコープモードと動的スコープモードを切り替えられるように
     static cell& lambda(cell& expr, cell::scope_type& scope) noexcept(false)
     {
       expr.closure = scope;
