@@ -33,11 +33,14 @@ namespace purelisp::arithmetic
                                 >::type>
   class function
   {
+    cell buffer_;
+
   public:
     cell& operator()(cell& expr, cell::scope_type& scope)
     {
       std::vector<T> args {};
 
+      // TODO ここで評価するのか、呼ぶ前に評価するのか考えなおすこと
       for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
       {
         args.emplace_back(evaluate(*iter, scope).value);
@@ -50,7 +53,7 @@ namespace purelisp::arithmetic
       // TODO comparison functions を分離
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
-        return expr = {cell::type::atom, boost::lexical_cast<cell::value_type>(buffer)};
+        return buffer_ = {cell::type::atom, boost::lexical_cast<cell::value_type>(buffer)};
       }
       else
       {

@@ -27,7 +27,7 @@
 namespace purelisp { inline namespace core
 {
   #ifdef VISUALIZE_DEFORMATION_PROCESS
-  void rewrite_expression(cell& expr)
+  [[deprecated]] void rewrite_expression(cell& expr)
   {
     static struct winsize window_size;
     ioctl(STDERR_FILENO, TIOCGWINSZ, &window_size);
@@ -165,28 +165,27 @@ namespace purelisp { inline namespace core
           return (*iter).second(expr, scope);
         }
 
-        switch (expr[0] = (*this)(expr[0], scope); expr[0].state) // こいつはムーブしたらダメ
+        switch (auto function {(*this)(expr[0], scope)}; function.state)
         {
         case cell::type::list:
-          for (std::size_t index {0}; index < std::size(expr[0].at(1)); ++index)
           {
-            expr.closure.emplace(expr[0][1].at(index).value, (*this)(expr.at(index + 1), scope));
-          }
+            cell::scope_type closure {};
 
-          for (const auto& each : scope) // TODO 既存要素を上書きしないことの確認
-          {
-            expr.closure.emplace(each);
-          }
+            for (std::size_t index {0}; index < std::size(function.at(1)); ++index)
+            {
+              closure.emplace(function.at(1).at(index).value, (*this)(expr.at(index + 1), scope));
+            }
 
-          return (*this)(expr[0].at(2), expr.closure);
+            for (const auto& each : scope)
+            {
+              closure.emplace(each);
+            }
+
+            return (*this)(function.at(2), closure);
+          }
 
         case cell::type::atom:
-          for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-          {
-            *iter = (*this)(*iter, scope);
-          }
-
-          return (*this)(scope.at(expr[0].value), scope);
+          return (*this)(scope.at(function.value), scope);
         }
       }
 
