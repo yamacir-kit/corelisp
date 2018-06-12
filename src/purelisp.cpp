@@ -8,10 +8,6 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
-#ifndef NDEBUG
-#define VISUALIZE_DEFORMATION_PROCESS
-#endif // NDEBUG
-
 #include <purelisp/core/cell.hpp>
 #include <purelisp/core/evaluator.hpp>
 #include <purelisp/core/tokenizer.hpp>
@@ -25,15 +21,16 @@ int main(int argc, char** argv)
   using namespace purelisp;
   using namespace boost::multiprecision;
 
-  evaluate["+"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::plus> {};
-  evaluate["-"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::minus> {};
-  evaluate["*"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::multiplies> {};
-  evaluate["/"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::divides> {};
-  evaluate["="]  = arithmetic::function</* cpp_dec_float_100 */ int, std::equal_to> {};
-  evaluate["<"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::less> {};
-  evaluate["<="] = arithmetic::function</* cpp_dec_float_100 */ int, std::less_equal> {};
-  evaluate[">"]  = arithmetic::function</* cpp_dec_float_100 */ int, std::greater> {};
-  evaluate[">="] = arithmetic::function</* cpp_dec_float_100 */ int, std::greater_equal> {};
+  using value_type = int; // boost::multiprecision::cpp_dec_float_100;
+  evaluate["+"]  = arithmetic::function<value_type, std::plus> {};
+  evaluate["-"]  = arithmetic::function<value_type, std::minus> {};
+  evaluate["*"]  = arithmetic::function<value_type, std::multiplies> {};
+  evaluate["/"]  = arithmetic::function<value_type, std::divides> {};
+  evaluate["="]  = arithmetic::function<value_type, std::equal_to> {};
+  evaluate["<"]  = arithmetic::function<value_type, std::less> {};
+  evaluate["<="] = arithmetic::function<value_type, std::less_equal> {};
+  evaluate[">"]  = arithmetic::function<value_type, std::greater> {};
+  evaluate[">="] = arithmetic::function<value_type, std::greater_equal> {};
 
   std::vector<std::string> tests
   {
@@ -46,9 +43,6 @@ int main(int argc, char** argv)
   for (const auto& each : tests)
   {
     evaluate(each);
-    #ifdef VISUALIZE_DEFORMATION_PROCESS
-    std::cerr << "\r\e[K";
-    #endif // VISUALIZE_DEFORMATION_PROCESS
   }
 
   std::vector<std::string> history {};
@@ -56,12 +50,8 @@ int main(int argc, char** argv)
   {
     const auto begin {std::chrono::high_resolution_clock::now()};
 
-    #ifndef VISUALIZE_DEFORMATION_PROCESS
-    std::cout <<
-    #endif // VISUALIZE_DEFORMATION_PROCESS
-                 evaluate(buffer);
-
-    std::cerr << " in "
+    std::cout << evaluate(buffer)
+              << " in "
               << std::chrono::duration_cast<std::chrono::milliseconds>(
                    std::chrono::high_resolution_clock::now() - begin
                  ).count()

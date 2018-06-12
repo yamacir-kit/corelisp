@@ -11,10 +11,6 @@
 
 #include <purelisp/core/cell.hpp>
 
-#ifdef VISUALIZE_DEFORMATION_PROCESS
-#include <purelisp/debug/rewrite_expression.hpp>
-#endif // VISUALIZE_DEFORMATION_PROCESS
-
 
 namespace purelisp { inline namespace core
 {
@@ -97,10 +93,6 @@ namespace purelisp { inline namespace core
 
     cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
     {
-      #ifdef VISUALIZE_DEFORMATION_PROCESS
-      BOOST_SCOPE_EXIT_ALL(this) { rewrite_expression(buffer_); };
-      #endif // VISUALIZE_DEFORMATION_PROCESS
-
       switch (expr.state)
       {
       case cell::type::atom:
@@ -127,7 +119,6 @@ namespace purelisp { inline namespace core
 
             for (std::size_t index {0}; index < std::size(function.at(1)); ++index)
             {
-              // closure.emplace(function.at(1).at(index).value, (*this)(expr.at(index + 1), scope));
               closure[function.at(1).at(index).value] = (*this)(expr.at(index + 1), scope);
             }
 
