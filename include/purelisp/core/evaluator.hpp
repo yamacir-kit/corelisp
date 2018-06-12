@@ -37,6 +37,19 @@ namespace purelisp { inline namespace core
         return (*this)((*this)(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
       };
 
+      (*this)["cond"] = [this](auto& expr, auto& scope) -> cell&
+      {
+        for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+        {
+          if ((*this)(iter->at(0), scope) != false_)
+          {
+            return (*this)(iter->at(1), scope);
+          }
+        }
+
+        return false_;
+      };
+
       (*this)["define"] = [this](auto& expr, auto& scope)
         -> decltype(auto)
       {
