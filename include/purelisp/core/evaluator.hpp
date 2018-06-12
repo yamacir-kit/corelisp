@@ -24,75 +24,6 @@ namespace purelisp { inline namespace core
     cell buffer_;
 
   public:
-    // evaluator()
-    //   : std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>> {
-    //       {"quote",  &purelisp::core::evaluator::quote},
-    //       {"lambda", &purelisp::core::evaluator::lambda},
-    //       {"eq",     &purelisp::core::evaluator::eq}
-    //     }
-    // {
-    //   (*this)["if"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     return (*this)((*this)(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
-    //   };
-    //
-    //   (*this)["cond"] = [this](auto& expr, auto& scope) -> cell&
-    //   {
-    //     for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
-    //     {
-    //       if ((*this)(iter->at(0), scope) != false_)
-    //       {
-    //         return (*this)(iter->at(1), scope);
-    //       }
-    //     }
-    //
-    //     return false_;
-    //   };
-    //
-    //   (*this)["define"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     scope.emplace(expr.at(1).value, (*this)(expr.at(2), scope));
-    //     return expr;
-    //   };
-    //
-    //   (*this)["atom"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     const auto& buffer {(*this)(expr.at(1), scope)};
-    //     return buffer.state != cell::type::atom && std::size(buffer) != 0 ? false_ : true_;
-    //   };
-    //
-    //   (*this)["cons"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     cell buffer {};
-    //
-    //     buffer.push_back((*this)(expr.at(1), scope));
-    //
-    //     for (const auto& each : (*this)(expr.at(2), scope))
-    //     {
-    //       buffer.push_back(each);
-    //     }
-    //
-    //     return expr = std::move(buffer);
-    //   };
-    //
-    //   (*this)["car"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     return (*this)(expr.at(1), scope).at(0);
-    //   };
-    //
-    //   (*this)["cdr"] = [this](auto& expr, auto& scope)
-    //     -> decltype(auto)
-    //   {
-    //     auto buffer {(*this)(expr.at(1), scope)};
-    //     return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : false_);
-    //   };
-    // }
-
     decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
     {
       return operator()(cell {s}, scope);
@@ -156,23 +87,6 @@ namespace purelisp { inline namespace core
       std::cerr << "(error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
       return false_;
     }
-
-  protected:
-    // static cell& quote(cell& expr, cell::scope_type&) noexcept(false)
-    // {
-    //   return expr.at(1);
-    // }
-    //
-    // static cell& lambda(cell& expr, cell::scope_type& scope) noexcept(false)
-    // {
-    //   expr.closure = scope;
-    //   return expr;
-    // }
-    //
-    // static cell& eq(cell& expr, cell::scope_type&) noexcept(false)
-    // {
-    //   return expr.at(1) != expr.at(2) ? false_ : true_;
-    // }
   } static evaluate;
 }} // namespace purelisp::core
 
