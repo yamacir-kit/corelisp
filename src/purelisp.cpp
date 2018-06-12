@@ -66,8 +66,6 @@ int main(int argc, char** argv)
                    std::chrono::high_resolution_clock::now() - begin
                  ).count()
               << "msec\n\n";
-
-    break;
   }
 
   return boost::exit_success;
