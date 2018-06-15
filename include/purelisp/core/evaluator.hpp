@@ -35,7 +35,6 @@ namespace purelisp { inline namespace core
       return operator()(buffer_, scope);
     }
 
-    // TODO constな純粋関数化
     cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
     {
       switch (expr.state)
