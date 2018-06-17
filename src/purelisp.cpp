@@ -91,8 +91,8 @@ auto define_origin_functions = [&]()
   evaluate["define"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    scope.emplace(expr.at(1).value, evaluate(expr.at(2), scope));
-    return expr;
+    scope.emplace(expr.at(1).value, std::make_shared<cell>(evaluate(expr.at(2), scope)));
+    return expr[2];
   };
 };
 

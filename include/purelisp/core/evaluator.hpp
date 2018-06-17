@@ -17,65 +17,72 @@ namespace purelisp { inline namespace core
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type dynamic_scope_ {
-      {"true", true_}, {"false", false_}
+    static inline cell::scope_type root_env {
+      {"true", std::make_shared<cell>("true")}, {"false", std::make_shared<cell>()}
     };
 
     cell buffer_;
 
   public:
-    decltype(auto) operator()(const std::string& s, cell::scope_type& scope = dynamic_scope_)
+    decltype(auto) operator()(const std::string& s, cell::scope_type& env = root_env)
     {
-      return operator()(cell {s}, scope);
+      return operator()(cell {s}, env);
     }
 
-    cell& operator()(cell&& expr, cell::scope_type& scope = dynamic_scope_)
+    cell& operator()(cell&& expr, cell::scope_type& env = root_env)
     {
       std::swap(buffer_, expr);
-      return operator()(buffer_, scope);
+      return operator()(buffer_, env);
     }
 
-    cell& operator()(cell& expr, cell::scope_type& scope = dynamic_scope_) try
+    cell& operator()(cell& expr, cell::scope_type& env = root_env) try
     {
       switch (expr.state)
       {
       case cell::type::atom:
-        if (auto iter {scope.find(expr.value)}; iter != std::end(scope))
+        if (auto iter {env.find(expr.value)}; iter != std::end(env))
         {
-          return (*iter).second;
+          return *(iter->second);
         }
-        else
-        {
-          return expr;
-        }
+        else return expr;
 
       case cell::type::list:
-        if (auto iter {find(expr.at(0).value)}; iter != std::end(*this)) // special forms
+        if (auto iter {find(expr.at(0).value)}; iter != std::end(*this))
         {
-          return (*iter).second(expr, scope);
+          return (iter->second)(expr, env);
         }
 
-        switch (auto& function {(*this)(expr[0], scope)}; function.state)
+        switch (auto& proc {(*this)(expr[0], env)}; proc.state)
         {
         case cell::type::list:
           {
-            cell::scope_type closure {};
+            // ステップ１：
+            // ラムダ式が定義時に保存した当時の環境（クロージャ）を取り出す
+            cell::scope_type scope {proc.closure};
 
-            for (std::size_t index {0}; index < std::size(function.at(1)); ++index)
+            // ステップ２：
+            // 実引数と仮引数の対応を保存する
+            // このとき定義時に同名の変数が存在していた場合は上書きする
+            // なぜなら引数のほうが内側のスコープであるためである
+            for (std::size_t index {0}; index < std::size(proc.at(1)); ++index)
             {
-              closure[function.at(1).at(index).value] = (*this)(expr.at(index + 1), scope);
+              scope[proc.at(1).at(index).value] = std::make_shared<cell>((*this)(expr.at(index + 1), env));
             }
 
-            for (const auto& each : scope)
+            // ステップ３：
+            // 今現在の環境をスコープへ収める
+            // このとき定義済みの変数が存在していた場合は上書きしない
+            // より外側のスコープの変数であるためである
+            for (const auto& each : env)
             {
-              closure.emplace(each);
+              scope.emplace(each);
             }
 
-            return (*this)(function.at(2), closure);
+            return (*this)(proc.at(2), scope);
           }
 
         case cell::type::atom:
-          return (*this)(scope.at(function.value), scope);
+          return (*this)(*(env.at(proc.value)), env);
         }
       }
 

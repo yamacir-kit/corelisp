@@ -5,9 +5,10 @@
 #include <iterator>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
-#include <boost/container/flat_map.hpp>
+// #include <boost/container/flat_map.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/tuple/tuple.hpp>
 
@@ -26,7 +27,8 @@ namespace purelisp { inline namespace core
     value_type value;
 
     // TODO コンテナの再選定
-    using scope_type = boost::container::flat_map<std::string, cell>;
+    // using scope_type = boost::container::flat_map<std::string, cell>;
+    using scope_type = std::unordered_map<std::string, std::shared_ptr<cell>>;
     scope_type closure;
 
   public:
