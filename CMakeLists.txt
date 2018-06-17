@@ -13,7 +13,7 @@ project(lisp VERSION ${MAJOR_VERSION}.${MINOR_VERSION}.${SUBMINOR_VERSION} LANGU
 
 set(${PROJECT_NAME}_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(CMAKE_BUILD_TYPE release)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O3 -s -fpermissive")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17 -O2 -s")
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Boost REQUIRED)
@@ -32,6 +32,6 @@ file(GLOB ${PROJECT_NAME}_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 foreach(EACH IN LISTS ${PROJECT_NAME}_SOURCES)
   string(REGEX REPLACE "^/(.*/)*(.*).cpp$" "\\2" TARGET ${EACH})
   add_executable(${TARGET} ${EACH})
-  target_link_libraries(${TARGET} ${Boost_LIBRARIES})
+  target_link_libraries(${TARGET} ${Boost_LIBRARIES} gmp)
 endforeach()
 

@@ -7,8 +7,7 @@
 #include <vector>
 
 #include <boost/cstdlib.hpp>
-#include <boost/multiprecision/cpp_dec_float.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/gmp.hpp>
 
 #include <purelisp/core/cell.hpp>
 #include <purelisp/core/evaluator.hpp>
@@ -109,7 +108,7 @@ auto define_scheme_functions = [&]()
     return evaluate(evaluate(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
   };
 
-  using value_type =  boost::multiprecision::cpp_int; // boost::multiprecision::cpp_dec_float_100;
+  using value_type = boost::multiprecision::mpf_float;
   evaluate["+"]  = arithmetic::function<value_type, std::plus> {};
   evaluate["-"]  = arithmetic::function<value_type, std::minus> {};
   evaluate["*"]  = arithmetic::function<value_type, std::multiplies> {};

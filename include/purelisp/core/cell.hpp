@@ -8,15 +8,26 @@
 #include <unordered_map>
 #include <vector>
 
-// #include <boost/container/flat_map.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/tuple/tuple.hpp>
-
-#include <purelisp/core/tokenizer.hpp>
 
 
 namespace purelisp { inline namespace core
 {
+  template <typename... Ts>
+  inline constexpr auto zip_begin(Ts&&... args)
+  {
+    using namespace boost;
+    return make_zip_iterator(boost::make_tuple(std::begin(args)...));
+  }
+
+  template <typename... Ts>
+  inline constexpr auto zip_end(Ts&&... args)
+  {
+    using namespace boost;
+    return make_zip_iterator(boost::make_tuple(std::end(args)...));
+  }
+
   class cell
     : public std::vector<cell>
   {
@@ -26,8 +37,6 @@ namespace purelisp { inline namespace core
     using value_type = std::string;
     value_type value;
 
-    // TODO コンテナの再選定
-    // using scope_type = boost::container::flat_map<std::string, cell>;
     using scope_type = std::unordered_map<std::string, std::shared_ptr<cell>>;
     scope_type closure;
 
@@ -47,25 +56,24 @@ namespace purelisp { inline namespace core
     {
       if (std::distance(first, last) != 0)
       {
-        if (*first == "(")
-        {
-          while (++first != last && *first != ")")
-          {
-            emplace_back(first, last);
-          }
-        }
-        else
+        if (*first != "(")
         {
           *this = {type::atom, *first};
+        }
+        else while (++first != last && *first != ")")
+        {
+          emplace_back(first, last);
         }
       }
     }
 
-    explicit cell(const tokenizer& tokens)
+    template <template <typename...> typename SequenceContainer>
+    explicit cell(const SequenceContainer<value_type>& tokens)
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
-    cell(tokenizer&& tokens)
+    template <template <typename...> typename SequenceContainer>
+    cell(SequenceContainer<value_type>&& tokens)
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
@@ -75,16 +83,6 @@ namespace purelisp { inline namespace core
       {
         return true;
       }
-
-      static auto zip_begin = [](auto&&... args) constexpr
-      {
-        return boost::make_zip_iterator(boost::make_tuple(std::begin(args)...));
-      };
-
-      static auto zip_end = [](auto&&... args) constexpr
-      {
-        return boost::make_zip_iterator(boost::make_tuple(std::end(args)...));
-      };
 
       for(auto iter {zip_begin(*this, rhs)}; iter != zip_end(*this, rhs); ++iter)
       {
@@ -97,7 +95,7 @@ namespace purelisp { inline namespace core
       return false;
     }
 
-    bool operator==(const cell& rhs)
+    bool operator==(const cell& rhs) const noexcept
     {
       return !(*this != rhs);
     }
