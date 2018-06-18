@@ -11,6 +11,8 @@
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/tuple/tuple.hpp>
 
+#include <purelisp/core/tokenizer.hpp>
+
 
 namespace purelisp { inline namespace core
 {
