@@ -10,9 +10,7 @@
 #include <vector>
 
 
-namespace purelisp
-{
-inline namespace core
+namespace purelisp { inline namespace core
 {
   class tokenizer
     : public std::vector<std::string>
@@ -22,10 +20,10 @@ inline namespace core
     {
       std::vector<std::string> buffer {};
 
-      for (auto iter {find_token_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_token_begin(iter, std::end(s)))
+      for (auto iter {find_begin(std::begin(s), std::end(s))}; iter != std::end(s); iter = find_begin(iter, std::end(s)))
       {
-        buffer.emplace_back(iter, is_round_brackets(*iter) ? iter + 1 : find_token_end(iter, std::end(s)));
-        iter += std::size(buffer.back());
+        buffer.emplace_back(iter, is_round_brackets(*iter) ? std::next(iter, 1) : find_end(iter, std::end(s)));
+        std::advance(iter, std::size(buffer.back()));
       }
 
       return buffer; // copy elision
@@ -43,7 +41,7 @@ inline namespace core
 
     auto& operator()(const std::string& s)
     {
-      return *this = std::move(tokenize_(s));
+      return *this = tokenize_(s);
     }
 
     friend auto operator<<(std::ostream& os, tokenizer& tokens)
@@ -58,14 +56,13 @@ inline namespace core
 
   protected:
     template <typename CharType>
-    static constexpr auto is_round_brackets(CharType c) noexcept
-      -> bool
+    static constexpr bool is_round_brackets(CharType c) noexcept
     {
       return c == '(' || c == ')';
     }
 
     template <typename InputIterator>
-    static constexpr auto find_token_begin(InputIterator first, InputIterator last)
+    static constexpr auto find_begin(InputIterator first, InputIterator last) noexcept
       -> InputIterator
     {
       return std::find_if(first, last, [](auto c)
@@ -75,7 +72,7 @@ inline namespace core
     }
 
     template <typename InputIterator>
-    static constexpr auto find_token_end(InputIterator first, InputIterator last)
+    static constexpr auto find_end(InputIterator first, InputIterator last) noexcept
       -> InputIterator
     {
       return std::find_if(first, last, [](auto c)
@@ -84,8 +81,7 @@ inline namespace core
              });
     }
   } static tokenize;
-} // inline namespace core
-} // namespace purelisp
+}} // namespace purelisp::core
 
 
 #endif // INCLUDED_PURELISP_CORE_TOKENIZER_HPP

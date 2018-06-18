@@ -17,8 +17,10 @@ namespace purelisp { inline namespace core
   class evaluator
     : public std::unordered_map<std::string, std::function<cell& (cell&, cell::scope_type&)>>
   {
-    static inline cell::scope_type root_env {
-      {"true", std::make_shared<cell>("true")}, {"false", std::make_shared<cell>()}
+    static inline cell::scope_type root_env
+    {
+      {"true", std::make_shared<cell>(cell::type::atom, "true")},
+      {"false", std::make_shared<cell>()}
     };
 
     cell buffer_;
@@ -26,7 +28,7 @@ namespace purelisp { inline namespace core
   public:
     decltype(auto) operator()(const std::string& s, cell::scope_type& env = root_env)
     {
-      return operator()(cell {s}, env);
+      return operator()(cell {tokenize(s)}, env);
     }
 
     cell& operator()(cell&& expr, cell::scope_type& env = root_env)
@@ -51,8 +53,7 @@ namespace purelisp { inline namespace core
         {
           return (iter->second)(expr, env);
         }
-
-        switch (auto& proc {(*this)(expr[0], env)}; proc.state)
+        else switch (auto& proc {(*this)(expr[0], env)}; proc.state)
         {
         case cell::type::list:
           {
