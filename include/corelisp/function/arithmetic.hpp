@@ -9,8 +9,8 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include <purelisp/core/cell.hpp>
-#include <purelisp/core/evaluator.hpp>
+#include <corelisp/lisp/cell.hpp>
+#include <corelisp/lisp/evaluator.hpp>
 
 
 namespace purelisp::arithmetic

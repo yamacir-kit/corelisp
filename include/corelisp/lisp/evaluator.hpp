@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include <purelisp/core/cell.hpp>
+#include <corelisp/lisp/cell.hpp>
 
 
 namespace purelisp { inline namespace core

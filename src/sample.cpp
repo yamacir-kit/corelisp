@@ -9,10 +9,10 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/gmp.hpp>
 
-#include <purelisp/core/cell.hpp>
-#include <purelisp/core/evaluator.hpp>
-#include <purelisp/core/tokenizer.hpp>
-#include <purelisp/function/arithmetic.hpp>
+#include <corelisp/lisp/cell.hpp>
+#include <corelisp/lisp/evaluator.hpp>
+#include <corelisp/lisp/tokenizer.hpp>
+#include <corelisp/function/arithmetic.hpp>
 
 
 auto define_origin_functions = [&]()

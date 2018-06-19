@@ -8,8 +8,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include <purelisp/core/tokenizer.hpp>
-#include <purelisp/utility/zip_iterator.hpp>
+#include <corelisp/lisp/tokenizer.hpp>
+#include <corelisp/utility/zip_iterator.hpp>
 
 
 namespace purelisp { inline namespace core
