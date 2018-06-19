@@ -31,12 +31,13 @@ namespace lisp
       : state {state}, value {value}
     {}
 
-    template <typename InputIterator,
-              typename = typename std::enable_if<
-                                    std::is_nothrow_constructible<
-                                      decltype(value), typename std::remove_reference<InputIterator>::type::value_type
-                                    >::value
-                                  >::type>
+    template <typename InputIterator
+    , typename = typename std::enable_if<
+                            std::is_nothrow_constructible<
+                              decltype(value),
+                              typename std::remove_reference<InputIterator>::type::value_type
+                            >::value
+                          >::type>
     vectored_cons_cells(InputIterator&& first, InputIterator&& last)
       : state {type::list}
     {
@@ -105,7 +106,7 @@ namespace lisp
       }
     }
   } static true_ {vectored_cons_cells::type::atom, "true"}, false_;
-}
+} // namespace lisp
 
 
 #endif // INCLUDED_CORELISP_LISP_VECTORED_CONS_CELLS_HPP

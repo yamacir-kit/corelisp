@@ -1,8 +1,11 @@
 #include <chrono>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <regex>
+#include <sstream>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <vector>
 
@@ -38,13 +41,13 @@ auto define_origin_functions = [&]()
     return  expr.at(1) != expr.at(2) ? false_ : true_;
   };
 
-  evaluate["car"] = [&](auto& expr, auto& scope)
+  evaluate["car"] = [&](auto& expr, auto& scope) // TODO クソ
     -> decltype(auto)
   {
     return evaluate(expr.at(1), scope).at(0);
   };
 
-  evaluate["cdr"] = [&](auto& expr, auto& scope)
+  evaluate["cdr"] = [&](auto& expr, auto& scope) // TODO クソ
     -> decltype(auto)
   {
     auto buffer {evaluate(expr.at(1), scope)};
@@ -138,37 +141,18 @@ int main(int argc, char** argv)
       }
     }
 
-    for (const auto& each : std::vector<std::string> {"^-s(.*)$", "^--syntax=(.*)$"})
-    {
-      if (std::regex_match(*iter, results, std::regex {each}) && results.ready())
-      {
-        static std::unordered_map<std::string, std::function<void (void)>> syntaxes
-        {
-          {"origin", define_origin_functions},
-          {"scheme", define_scheme_functions}
-        };
-
-        if (auto syntax {syntaxes.find(results[1])}; syntax != std::end(syntaxes))
-        {
-          return (*syntax).second();
-        }
-        else
-        {
-          std::cerr << "[error] unexpected syntax specified: \e[31m\"" << *iter << "\"\e[0m" << std::endl;
-          std::exit(boost::exit_failure);
-        }
-      }
-    }
-
     std::cerr << "[error] unexpected option specified: \e[31m\"" << *iter << "\"\e[0m" << std::endl;
     std::exit(boost::exit_failure);
   }();
+
+  define_origin_functions();
+  define_scheme_functions();
 
   std::vector<std::string> tests
   {
     "(define fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
     "(define tarai (lambda (x y z) (if (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
-    "(define map (lambda (func e) (if (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
+    "(define map (lambda (f e) (if (eq? e false) false (cons (f (car e)) (map f (cdr e))))))",
     "(define x (quote (1 2 3 4 5)))",
     "(define factorial (lambda (n) (cond ((< n 0) false) ((<= n 1) 1) (true (* n (factorial (- n 1)))))))"
   };
@@ -177,6 +161,29 @@ int main(int argc, char** argv)
   {
     lisp::evaluate(each);
   }
+
+  std::fstream fstream {"../tests.scm", std::ios_base::in};
+
+  std::string library {"(quote ("};
+
+  for (std::string buffer {}; std::getline(fstream, buffer);)
+  {
+    library += buffer;
+
+    for (const auto& each : buffer)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds {10});
+      std::cout << each << std::flush;
+    }
+
+    std::cout << std::endl;
+  }
+
+  library += "))";
+
+  std::cout << "[debug] library evaluation "
+            << (lisp::evaluate(library) != lisp::false_ ? "succeeded" : "failed")
+            << "\n\n";
 
   for (std::string buffer {}; std::cout << ">> ", std::getline(std::cin, buffer);)
   {
