@@ -1,6 +1,6 @@
-# Pure LISP interpreter by C++17
+# Lisp interpreter core library by C++17
 
-Version 1.0.52 in development.
+Version 1.0.54 in development.
 
 ## Overview
 
@@ -10,13 +10,11 @@ To do description.
 
 As short as possible. But, must NOT be dismissed readability, maintainability, speed, and above all, beautifulness.
 
-- 純LISP以上の機能を求めない。
-  組み込み関数を簡潔に追加可能なAPIを提供するに留める。
-
 ## Dependency
 
 - C++17
 - Boost C++ Libraries 1.58.0
+- GNU Multi-Precision Library (only sample code depends)
 
 ## Build
 
