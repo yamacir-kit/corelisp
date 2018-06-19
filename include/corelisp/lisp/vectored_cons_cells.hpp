@@ -1,5 +1,5 @@
-#ifndef INCLUDED_PURELISP_CORE_CELL_HPP
-#define INCLUDED_PURELISP_CORE_CELL_HPP
+#ifndef INCLUDED_CORELISP_LISP_VECTORED_CONS_CELLS_HPP
+#define INCLUDED_CORELISP_LISP_VECTORED_CONS_CELLS_HPP
 
 
 #include <iterator>
@@ -12,10 +12,10 @@
 #include <corelisp/utility/zip_iterator.hpp>
 
 
-namespace purelisp { inline namespace core
+namespace lisp
 {
-  class cell
-    : public std::vector<cell>
+  class vectored_cons_cells
+    : public std::vector<vectored_cons_cells>
   {
   public: // data members
     enum class type { list, atom } state; // TODO deprecated
@@ -23,11 +23,11 @@ namespace purelisp { inline namespace core
     using value_type = std::string;
     value_type value;
 
-    using scope_type = std::unordered_map<std::string, std::shared_ptr<cell>>;
+    using scope_type = std::unordered_map<std::string, std::shared_ptr<vectored_cons_cells>>;
     scope_type closure;
 
   public: // constructors
-    cell(type state = type::list, const std::string& value = "")
+    vectored_cons_cells(type state = type::list, const std::string& value = "")
       : state {state}, value {value}
     {}
 
@@ -37,7 +37,7 @@ namespace purelisp { inline namespace core
                                       decltype(value), typename std::remove_reference<InputIterator>::type::value_type
                                     >::value
                                   >::type>
-    cell(InputIterator&& first, InputIterator&& last)
+    vectored_cons_cells(InputIterator&& first, InputIterator&& last)
       : state {type::list}
     {
       if (std::distance(first, last) != 0)
@@ -54,17 +54,17 @@ namespace purelisp { inline namespace core
     }
 
     template <template <typename...> typename SequenceContainer>
-    explicit cell(const SequenceContainer<value_type>& tokens)
-      : cell {std::begin(tokens), std::end(tokens)}
+    explicit vectored_cons_cells(const SequenceContainer<value_type>& tokens)
+      : vectored_cons_cells {std::begin(tokens), std::end(tokens)}
     {}
 
     template <template <typename...> typename SequenceContainer>
-    cell(SequenceContainer<value_type>&& tokens)
-      : cell {std::begin(tokens), std::end(tokens)}
+    vectored_cons_cells(SequenceContainer<value_type>&& tokens)
+      : vectored_cons_cells {std::begin(tokens), std::end(tokens)}
     {}
 
   public: // operators
-    bool operator!=(const cell& rhs) const noexcept
+    bool operator!=(const vectored_cons_cells& rhs) const noexcept
     {
       if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       {
@@ -82,12 +82,12 @@ namespace purelisp { inline namespace core
       return false;
     }
 
-    bool operator==(const cell& rhs) const noexcept
+    bool operator==(const vectored_cons_cells& rhs) const noexcept
     {
       return !(*this != rhs);
     }
 
-    friend auto operator<<(std::ostream& os, const cell& e)
+    friend auto operator<<(std::ostream& os, const vectored_cons_cells& e)
       -> std::ostream&
     {
       switch (e.state)
@@ -104,9 +104,9 @@ namespace purelisp { inline namespace core
         return os << e.value;
       }
     }
-  } static true_ {cell::type::atom, "true"}, false_;
-}} // namespace purelisp::core
+  } static true_ {vectored_cons_cells::type::atom, "true"}, false_;
+}
 
 
-#endif // INCLUDED_PURELISP_CORE_CELL_HPP
+#endif // INCLUDED_CORELISP_LISP_VECTORED_CONS_CELLS_HPP
 

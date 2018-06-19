@@ -9,15 +9,15 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/gmp.hpp>
 
-#include <corelisp/lisp/cell.hpp>
 #include <corelisp/lisp/evaluator.hpp>
 #include <corelisp/lisp/tokenizer.hpp>
-#include <corelisp/function/arithmetic.hpp>
+#include <corelisp/lisp/vectored_cons_cells.hpp>
+#include <corelisp/builtin/arithmetic.hpp>
 
 
 auto define_origin_functions = [&]()
 {
-  using namespace purelisp;
+  using namespace lisp;
 
   evaluate["quote"] = [&](auto& e, auto&) noexcept
     -> decltype(auto)
@@ -29,7 +29,7 @@ auto define_origin_functions = [&]()
     -> decltype(auto)
   {
     const auto& buffer {evaluate(expr.at(1), scope)};
-    return buffer.state != cell::type::atom && std::size(buffer) != 0 ? false_ : true_; // XXX これ正しい？
+    return buffer.state != vectored_cons_cells::type::atom && std::size(buffer) != 0 ? false_ : true_; // XXX これ正しい？
   };
 
   evaluate["eq"] = [](auto& expr, auto&)
@@ -54,7 +54,7 @@ auto define_origin_functions = [&]()
   evaluate["cons"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    cell buffer {};
+    vectored_cons_cells buffer {};
 
     buffer.push_back(evaluate(expr.at(1), scope));
 
@@ -67,7 +67,7 @@ auto define_origin_functions = [&]()
   };
 
   evaluate["cond"] = [&](auto& expr, auto& scope)
-    -> cell&
+    -> vectored_cons_cells&
   {
     for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
     {
@@ -90,7 +90,7 @@ auto define_origin_functions = [&]()
   evaluate["define"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
   {
-    scope.emplace(expr.at(1).value, std::make_shared<cell>(evaluate(expr.at(2), scope)));
+    scope.emplace(expr.at(1).value, std::make_shared<vectored_cons_cells>(evaluate(expr.at(2), scope)));
     return expr[2];
   };
 };
@@ -98,7 +98,7 @@ auto define_origin_functions = [&]()
 
 auto define_scheme_functions = [&]()
 {
-  using namespace purelisp;
+  using namespace lisp;
 
   define_origin_functions();
 
@@ -109,15 +109,15 @@ auto define_scheme_functions = [&]()
   };
 
   using value_type = boost::multiprecision::mpf_float;
-  evaluate["+"]  = arithmetic::function<value_type, std::plus> {};
-  evaluate["-"]  = arithmetic::function<value_type, std::minus> {};
-  evaluate["*"]  = arithmetic::function<value_type, std::multiplies> {};
-  evaluate["/"]  = arithmetic::function<value_type, std::divides> {};
-  evaluate["="]  = arithmetic::function<value_type, std::equal_to> {};
-  evaluate["<"]  = arithmetic::function<value_type, std::less> {};
-  evaluate["<="] = arithmetic::function<value_type, std::less_equal> {};
-  evaluate[">"]  = arithmetic::function<value_type, std::greater> {};
-  evaluate[">="] = arithmetic::function<value_type, std::greater_equal> {};
+  evaluate["+"]  = builtin::arithmetic<value_type, std::plus> {};
+  evaluate["-"]  = builtin::arithmetic<value_type, std::minus> {};
+  evaluate["*"]  = builtin::arithmetic<value_type, std::multiplies> {};
+  evaluate["/"]  = builtin::arithmetic<value_type, std::divides> {};
+  evaluate["="]  = builtin::arithmetic<value_type, std::equal_to> {};
+  evaluate["<"]  = builtin::arithmetic<value_type, std::less> {};
+  evaluate["<="] = builtin::arithmetic<value_type, std::less_equal> {};
+  evaluate[">"]  = builtin::arithmetic<value_type, std::greater> {};
+  evaluate[">="] = builtin::arithmetic<value_type, std::greater_equal> {};
 };
 
 
@@ -164,8 +164,6 @@ int main(int argc, char** argv)
     std::exit(boost::exit_failure);
   }();
 
-  using namespace purelisp;
-
   std::vector<std::string> tests
   {
     "(define fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
@@ -177,17 +175,16 @@ int main(int argc, char** argv)
 
   for (const auto& each : tests)
   {
-    evaluate(each);
+    lisp::evaluate(each);
   }
 
-  std::vector<std::string> history {};
-  for (std::string buffer {}; std::cout << "[" << std::size(history) << "] << ", std::getline(std::cin, buffer); history.push_back(buffer))
+  for (std::string buffer {}; std::cout << ">> ", std::getline(std::cin, buffer);)
   {
     using namespace std::chrono;
 
     const auto begin {high_resolution_clock::now()};
 
-    std::cout << evaluate(buffer)
+    std::cout << lisp::evaluate(buffer)
               << " in "
               << duration_cast<milliseconds>(high_resolution_clock::now() - begin).count()
               << "msec\n\n";

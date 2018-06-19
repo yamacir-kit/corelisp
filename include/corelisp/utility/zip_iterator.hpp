@@ -1,5 +1,5 @@
-#ifndef INCLUDED_PURELISP_UTILITY_ZIP_ITERATOR_HPP
-#define INCLUDED_PURELISP_UTILITY_ZIP_ITERATOR_HPP
+#ifndef INCLUDED_CORELISP_UTILITY_ZIP_ITERATOR_HPP
+#define INCLUDED_CORELISP_UTILITY_ZIP_ITERATOR_HPP
 
 
 #include <iterator>
@@ -8,7 +8,7 @@
 #include <boost/tuple/tuple.hpp>
 
 
-namespace purelisp::utility
+namespace utility
 {
   template <typename... Ts>
   inline constexpr auto zip_begin(Ts&&... args)
@@ -23,8 +23,8 @@ namespace purelisp::utility
     using namespace boost;
     return make_zip_iterator(boost::make_tuple(std::end(args)...));
   }
-} // namespace purelisp::utility
+} // namespace utility
 
 
-#endif // INCLUDED_PURELISP_UTILITY_ZIP_ITERATOR_HPP
+#endif // INCLUDED_CORELISP_UTILITY_ZIP_ITERATOR_HPP
 
