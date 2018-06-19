@@ -8,33 +8,17 @@
 #include <unordered_map>
 #include <vector>
 
-#include <boost/iterator/zip_iterator.hpp>
-#include <boost/tuple/tuple.hpp>
-
 #include <purelisp/core/tokenizer.hpp>
+#include <purelisp/utility/zip_iterator.hpp>
 
 
 namespace purelisp { inline namespace core
 {
-  template <typename... Ts>
-  inline constexpr auto zip_begin(Ts&&... args)
-  {
-    using namespace boost;
-    return make_zip_iterator(boost::make_tuple(std::begin(args)...));
-  }
-
-  template <typename... Ts>
-  inline constexpr auto zip_end(Ts&&... args)
-  {
-    using namespace boost;
-    return make_zip_iterator(boost::make_tuple(std::end(args)...));
-  }
-
   class cell
     : public std::vector<cell>
   {
-  public:
-    enum class type { list, atom } state;
+  public: // data members
+    enum class type { list, atom } state; // TODO deprecated
 
     using value_type = std::string;
     value_type value;
@@ -42,7 +26,7 @@ namespace purelisp { inline namespace core
     using scope_type = std::unordered_map<std::string, std::shared_ptr<cell>>;
     scope_type closure;
 
-  public:
+  public: // constructors
     cell(type state = type::list, const std::string& value = "")
       : state {state}, value {value}
     {}
@@ -79,6 +63,7 @@ namespace purelisp { inline namespace core
       : cell {std::begin(tokens), std::end(tokens)}
     {}
 
+  public: // operators
     bool operator!=(const cell& rhs) const noexcept
     {
       if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
@@ -86,7 +71,7 @@ namespace purelisp { inline namespace core
         return true;
       }
 
-      for(auto iter {zip_begin(*this, rhs)}; iter != zip_end(*this, rhs); ++iter)
+      for(auto iter {utility::zip_begin(*this, rhs)}; iter != utility::zip_end(*this, rhs); ++iter)
       {
         if (boost::get<0>(*iter) != boost::get<1>(*iter))
         {
@@ -102,21 +87,21 @@ namespace purelisp { inline namespace core
       return !(*this != rhs);
     }
 
-    friend auto operator<<(std::ostream& os, const cell& expr)
+    friend auto operator<<(std::ostream& os, const cell& e)
       -> std::ostream&
     {
-      switch (expr.state)
+      switch (e.state)
       {
       case type::list:
         os <<  '(';
-        for (const auto& each : expr)
+        for (const auto& each : e)
         {
-          os << each << (&each != &expr.back() ? " " : "");
+          os << each << (&each != &e.back() ? " " : "");
         }
         return os << ')';
 
       default:
-        return os << expr.value;
+        return os << e.value;
       }
     }
   } static true_ {cell::type::atom, "true"}, false_;

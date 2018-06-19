@@ -108,7 +108,7 @@ auto define_scheme_functions = [&]()
     return evaluate(evaluate(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
   };
 
-  using value_type = boost::multiprecision::mpz_int;
+  using value_type = boost::multiprecision::mpf_float;
   evaluate["+"]  = arithmetic::function<value_type, std::plus> {};
   evaluate["-"]  = arithmetic::function<value_type, std::minus> {};
   evaluate["*"]  = arithmetic::function<value_type, std::multiplies> {};
@@ -169,9 +169,9 @@ int main(int argc, char** argv)
   std::vector<std::string> tests
   {
     "(define fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
-    // "(define tarai (lambda (x y z) (if (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
-    // "(define map (lambda (func e) (if (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
-    // "(define x (quote (1 2 3 4 5)))",
+    "(define tarai (lambda (x y z) (if (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
+    "(define map (lambda (func e) (if (eq e false) false (cons (func (car e)) (map func (cdr e))))))",
+    "(define x (quote (1 2 3 4 5)))",
     "(define factorial (lambda (n) (cond ((< n 0) false) ((<= n 1) 1) (true (* n (factorial (- n 1)))))))"
   };
 
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
   }
 
   std::vector<std::string> history {};
-  for (std::string buffer {}; std::cout << "[" << std::size(history) << "]< ", std::getline(std::cin, buffer); history.push_back(buffer))
+  for (std::string buffer {}; std::cout << "[" << std::size(history) << "] << ", std::getline(std::cin, buffer); history.push_back(buffer))
   {
     using namespace std::chrono;
 
