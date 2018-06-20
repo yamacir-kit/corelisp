@@ -67,6 +67,11 @@ namespace lisp
   public: // operators
     bool operator!=(const vectored_cons_cells& rhs) const noexcept
     {
+      if (&(*this) == &rhs) // アドレスが等しい場合は即座に比較終了
+      {
+        return false;
+      }
+
       if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       {
         return true;
