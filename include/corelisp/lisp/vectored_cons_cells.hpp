@@ -4,11 +4,13 @@
 
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 #include <corelisp/lisp/tokenizer.hpp>
+// #include <corelisp/utility/vector_view.hpp>
 #include <corelisp/utility/zip_iterator.hpp>
 
 
@@ -17,18 +19,21 @@ namespace lisp
   class vectored_cons_cells
     : public std::vector<vectored_cons_cells>
   {
-  public: // data members
-    enum class type { list, atom } state; // TODO deprecated
+  public: // attirbutes
+    // enum class type { list, atom } state; // TODO deprecated
 
     using value_type = std::string;
-    value_type value;
+    value_type value; // TODO to be constant
 
     using scope_type = std::unordered_map<std::string, std::shared_ptr<vectored_cons_cells>>;
     scope_type closure;
 
   public: // constructors
-    vectored_cons_cells(type state = type::list, const std::string& value = "")
-      : state {state}, value {value}
+    // vectored_cons_cells(type state = type::list, const std::string& value = "")
+    //   : state {state}, value {value}
+    // {}
+    vectored_cons_cells(const value_type& value = "")
+      : value {value}
     {}
 
     template <typename InputIterator
@@ -38,18 +43,19 @@ namespace lisp
                               typename std::remove_reference<InputIterator>::type::value_type
                             >::value
                           >::type>
-    vectored_cons_cells(InputIterator&& first, InputIterator&& last)
-      : state {type::list}
+    vectored_cons_cells(InputIterator&& begin, InputIterator&& end)
+      // : state {type::list}
     {
-      if (std::distance(first, last) != 0)
+      if (std::distance(begin, end) != 0)
       {
-        if (*first != "(")
+        if (*begin != "(")
         {
-          *this = {type::atom, *first};
+          // *this = {type::atom, *first};
+          (*this).value = *begin;
         }
-        else while (++first != last && *first != ")")
+        else while (++begin != end && *begin != ")")
         {
-          emplace_back(first, last);
+          emplace_back(begin, end);
         }
       }
     }
@@ -64,6 +70,17 @@ namespace lisp
       : vectored_cons_cells {std::begin(tokens), std::end(tokens)}
     {}
 
+  public: // accesses
+    bool atom() const noexcept // is_atomの方が良いだろうか
+    {
+      return std::empty(*this);
+    }
+
+    friend auto atom(const vectored_cons_cells& e) noexcept
+    {
+      return e.atom();
+    }
+
   public: // operators
     bool operator!=(const vectored_cons_cells& rhs) const noexcept
     {
@@ -72,7 +89,8 @@ namespace lisp
         return false;
       }
 
-      if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
+      // if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
+      if (std::size(*this) != std::size(rhs) or (*this).value != rhs.value)
       {
         return true;
       }
@@ -96,21 +114,25 @@ namespace lisp
     friend auto operator<<(std::ostream& os, const vectored_cons_cells& e)
       -> std::ostream&
     {
-      switch (e.state)
+      if (not e.atom())
       {
-      case type::list:
         os <<  '(';
         for (const auto& each : e)
         {
           os << each << (&each != &e.back() ? " " : "");
         }
         return os << ')';
-
-      default:
-        return os << e.value;
       }
+      else return os << e.value;
     }
-  } static true_ {vectored_cons_cells::type::atom, "true"}, false_;
+  } static true_ {"true"}, false_;
+
+
+  class vectored_cons_cells_view
+    : public utility::vector_view<vectored_cons_cells>
+  {
+  public:
+  };
 } // namespace lisp
 
 

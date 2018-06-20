@@ -28,11 +28,12 @@ auto define_origin_functions = [&]()
     return std::size(e) != 2 ? false_ : e[1];
   };
 
-  evaluate["atom"] = [&](auto& expr, auto& scope)
+  evaluate["atom"] = [&](auto& e, auto& env)
     -> decltype(auto)
   {
-    const auto& buffer {evaluate(expr.at(1), scope)};
-    return buffer.state != vectored_cons_cells::type::atom && std::size(buffer) != 0 ? false_ : true_; // XXX これ正しい？
+    // const auto& buffer {evaluate(expr.at(1), scope)};
+    // return buffer.state != vectored_cons_cells::type::atom && std::size(buffer) != 0 ? false_ : true_; // XXX これ正しい？
+    return evaluate(e.at(1), env).atom() ? true_ : false_;
   };
 
   evaluate["eq"] = [](auto& expr, auto&)
