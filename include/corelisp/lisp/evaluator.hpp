@@ -19,51 +19,53 @@ namespace lisp
                std::function<vectored_cons_cells& (vectored_cons_cells&, vectored_cons_cells::scope_type&)>
              >
   {
-    static inline vectored_cons_cells::scope_type root_env_
+    using cells_type = vectored_cons_cells;
+    using value_type = typename cells_type::value_type;
+    using scope_type = typename cells_type::scope_type;
+
+    static inline scope_type env_
     {
-      {"true", std::make_shared<vectored_cons_cells>(vectored_cons_cells::type::atom, "true")},
-      {"false", std::make_shared<vectored_cons_cells>()}
+      {"true",  std::make_shared<cells_type>(cells_type::type::atom, "true")},
+      {"false", std::make_shared<cells_type>()}
     };
 
-    vectored_cons_cells buffer_;
-
   public:
-    decltype(auto) operator()(const vectored_cons_cells::value_type& s, vectored_cons_cells::scope_type& env = root_env_)
+    decltype(auto) operator()(const value_type& s, scope_type& env = env_)
     {
-      return operator()(vectored_cons_cells {tokenize(s)}, env);
+      return operator()(cells_type {tokenize(s)}, env);
     }
 
-    auto operator()(vectored_cons_cells&& expr, vectored_cons_cells::scope_type& env = root_env_)
-      -> vectored_cons_cells&
+    auto operator()(cells_type&& e, scope_type& env = env_)
+      -> cells_type&
     {
-      std::swap(buffer_, expr);
-      return operator()(buffer_, env);
+      auto buffer {e};
+      return operator()(buffer, env);
     }
 
-    auto operator()(vectored_cons_cells& expr, vectored_cons_cells::scope_type& env = root_env_)
-      -> vectored_cons_cells& try
+    auto operator()(cells_type& e, scope_type& env = env_)
+      -> cells_type& try
     {
-      switch (expr.state)
+      switch (e.state)
       {
-      case vectored_cons_cells::type::atom:
-        if (auto iter {env.find(expr.value)}; iter != std::end(env))
+      case cells_type::type::atom:
+        if (auto iter {env.find(e.value)}; iter != std::end(env))
         {
           return *(iter->second);
         }
-        else return expr;
+        else return e;
 
-      case vectored_cons_cells::type::list:
-        if (auto iter {find(expr.at(0).value)}; iter != std::end(*this))
+      case cells_type::type::list:
+        if (auto iter {find(e.at(0).value)}; iter != std::end(*this))
         {
-          return (iter->second)(expr, env);
+          return (iter->second)(e, env);
         }
-        else switch (auto& proc {(*this)(expr[0], env)}; proc.state)
+        else switch (auto& proc {(*this)(e[0], env)}; proc.state)
         {
-        case vectored_cons_cells::type::list:
+        case cells_type::type::list:
           {
             // ステップ１：
             // ラムダ式が定義時に保存した当時の環境（クロージャ）を取り出す
-            vectored_cons_cells::scope_type scope {proc.closure};
+            scope_type scope {proc.closure};
 
             // ステップ２：
             // 実引数と仮引数の対応を保存する
@@ -71,7 +73,7 @@ namespace lisp
             // なぜなら引数のほうが内側のスコープであるためである
             for (std::size_t index {0}; index < std::size(proc.at(1)); ++index)
             {
-              scope[proc.at(1).at(index).value] = std::make_shared<vectored_cons_cells>((*this)(expr.at(index + 1), env));
+              scope[proc.at(1).at(index).value] = std::make_shared<cells_type>((*this)(e.at(index + 1), env));
             }
 
             // ステップ３：
@@ -95,7 +97,7 @@ namespace lisp
     }
     catch (const std::exception& ex)
     {
-      std::cerr << "(error " << ex.what() << " \e[31m" << expr << "\e[0m) -> " << std::flush;
+      std::cerr << "(error " << ex.what() << " in expression \e[31m" << e << "\e[0m) -> " << std::flush;
       return false_;
     }
   } static evaluate;
