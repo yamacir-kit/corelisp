@@ -47,7 +47,7 @@ namespace lisp
     auto operator()(cells_type& e, scope_type& env = env_)
       -> cells_type& try
     {
-      if (atom(e))
+      if (e.is_atom())
       {
         if (auto iter {env.find(e.value)}; iter != std::end(env))
         {
@@ -61,30 +61,20 @@ namespace lisp
         {
           return (iter->second)(e, env);
         }
-        else if (auto& proc {(*this)(e[0], env)}; atom(proc))
+        else if (auto& proc {(*this)(e[0], env)}; proc.is_atom())
         {
           return (*this)(*(env.at(proc.value)), env);
         }
         else
         {
-          // ステップ１：
-          // ラムダ式が定義時に保存した当時の環境（クロージャ）を取り出す
           scope_type scope {proc.closure};
 
-          // ステップ２：
-          // 実引数と仮引数の対応を保存する
-          // このとき定義時に同名の変数が存在していた場合は上書きする
-          // なぜなら引数のほうが内側のスコープであるためである
           for (std::size_t index {0}; index < std::size(proc.at(1)); ++index)
           {
             scope[proc.at(1).at(index).value] = std::make_shared<cells_type>((*this)(e.at(index + 1), env));
           }
 
-          // ステップ３：
-          // 今現在の環境をスコープへ収める
-          // このとき定義済みの変数が存在していた場合は上書きしない
-          // より外側のスコープの変数であるためである
-          for (const auto& each : env)
+          for (const auto& each : env) // XXX shared_ptrをコピーせずに直接構築してる説あり
           {
             scope.emplace(each);
           }

@@ -8,6 +8,7 @@
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <corelisp/lisp/tokenizer.hpp>
@@ -70,14 +71,20 @@ namespace lisp
     {}
 
   public: // accesses
-    bool atom() const noexcept // is_atomの方が良いだろうか
+    bool is_atom() const noexcept // is_atomの方が良いだろうか
     {
       return std::empty(*this);
     }
 
     friend auto atom(const vectored_cons_cells& e) noexcept
     {
-      return e.atom();
+      return e.is_atom();
+    }
+
+  public: // operation
+    auto share() noexcept(noexcept(std::make_shared<vectored_cons_cells>(std::declval<vectored_cons_cells>())))
+    {
+      return std::make_shared<vectored_cons_cells>(*this);
     }
 
   public: // operators
@@ -116,7 +123,7 @@ namespace lisp
     friend auto operator<<(std::ostream& os, const vectored_cons_cells& e)
       -> std::ostream&
     {
-      if (not e.atom())
+      if (not e.is_atom())
       {
         os <<  '(';
         for (const auto& each : e)

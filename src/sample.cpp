@@ -33,13 +33,13 @@ auto define_builtins = [&]()
   evaluate["atom"] = [&](auto& e, auto& env)
     -> decltype(auto)
   {
-    return evaluate(e.at(1), env).atom() ? true_ : false_;
+    return evaluate(e.at(1), env).is_atom() ? true_ : false_;
   };
 
-  evaluate["eq"] = [](auto& expr, auto&)
+  evaluate["eq"] = [](auto& e, auto&) // XXX EQって可変長じゃなくても良かったっけ
     -> decltype(auto)
   {
-    return  expr.at(1) != expr.at(2) ? false_ : true_;
+    return  e.at(1) != e.at(2) ? false_ : true_;
   };
 
   evaluate["car"] = [&](auto& expr, auto& scope) // TODO クソ
@@ -55,7 +55,7 @@ auto define_builtins = [&]()
     return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : false_);
   };
 
-  evaluate["cons"] = [&](auto& expr, auto& scope)
+  evaluate["cons"] = [&](auto& expr, auto& scope) // TODO クソ
     -> decltype(auto)
   {
     vectored_cons_cells buffer {};
@@ -70,14 +70,14 @@ auto define_builtins = [&]()
     return expr = std::move(buffer);
   };
 
-  evaluate["cond"] = [&](auto& expr, auto& scope)
+  evaluate["cond"] = [&](auto& e, auto& env)
     -> vectored_cons_cells&
   {
-    for (auto iter {std::begin(expr) + 1}; iter != std::end(expr); ++iter)
+    for (auto iter {std::begin(e) + 1}; iter != std::end(e); ++iter)
     {
-      if (evaluate(iter->at(0), scope) != false_)
+      if (evaluate(iter->at(0), env) != false_)
       {
-        return evaluate(iter->at(1), scope);
+        return evaluate(iter->at(1), env);
       }
     }
 
@@ -91,17 +91,16 @@ auto define_builtins = [&]()
     return expr;
   };
 
-  evaluate["define"] = [&](auto& expr, auto& scope)
+  evaluate["define"] = [&](auto& e, auto& env) noexcept
     -> decltype(auto)
   {
-    scope.emplace(expr.at(1).value, std::make_shared<vectored_cons_cells>(evaluate(expr.at(2), scope)));
-    return expr[2];
+    return std::size(e) != 3 ? false_ : (env.emplace(e[1].value, evaluate(e[2], env).share()), e[2]);
   };
 
-  evaluate["if"] = [&](auto& expr, auto& scope)
+  evaluate["if"] = [&](auto& e, auto& env) noexcept
     -> decltype(auto)
   {
-    return evaluate(evaluate(expr.at(1), scope) != false_ ? expr.at(2) : expr.at(3), scope);
+    return std::size(e) != 4 ? false_ : evaluate(evaluate(e[1], env) != false_ ? e[2] : e[3], env);
   };
 
   using value_type = boost::multiprecision::mpf_float;
@@ -154,28 +153,28 @@ int main(int argc, char** argv)
     lisp::evaluate(each);
   }
 
-  std::fstream fstream {"../tests.scm", std::ios_base::in};
-
-  std::string library {"(quote ("};
-
-  for (std::string buffer {}; std::getline(fstream, buffer);)
-  {
-    library += buffer;
-
-    for (const auto& each : buffer)
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds {10});
-      std::cout << each << std::flush;
-    }
-
-    std::cout << std::endl;
-  }
-
-  library += "))";
-
-  std::cout << "[debug] library evaluation "
-            << (lisp::evaluate(library) != lisp::false_ ? "succeeded" : "failed")
-            << "\n\n";
+  // std::fstream fstream {"../tests.scm", std::ios_base::in};
+  //
+  // std::string library {"(quote ("};
+  //
+  // for (std::string buffer {}; std::getline(fstream, buffer);)
+  // {
+  //   library += buffer;
+  //
+  //   for (const auto& each : buffer)
+  //   {
+  //     std::this_thread::sleep_for(std::chrono::milliseconds {10});
+  //     std::cout << each << std::flush;
+  //   }
+  //
+  //   std::cout << std::endl;
+  // }
+  //
+  // library += "))";
+  //
+  // std::cout << "[debug] library evaluation "
+  //           << (lisp::evaluate(library) != lisp::false_ ? "succeeded" : "failed")
+  //           << "\n\n";
 
   for (std::string buffer {}; std::cout << ">> ", std::getline(std::cin, buffer);)
   {
