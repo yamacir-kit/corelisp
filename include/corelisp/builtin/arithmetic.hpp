@@ -47,11 +47,15 @@ namespace builtin
                         >::type>
   class arithmetic
   {
-    lisp::vectored_cons_cells buffer_;
+    using cells_type = lisp::vectored_cons_cells;
+    using value_type = typename cells_type::value_type;
+    using scope_type = typename cells_type::scope_type;
+
+    cells_type buffer_;
 
   public:
-    auto operator()(lisp::vectored_cons_cells& expr, lisp::vectored_cons_cells::scope_type& scope)
-      -> lisp::vectored_cons_cells&
+    auto operator()(cells_type& expr, scope_type& scope)
+      -> cells_type&
     {
       std::vector<T> args {};
 
@@ -67,7 +71,7 @@ namespace builtin
       // TODO comparison functions を分離
       if constexpr (std::is_same<typename BinaryOperator<T>::result_type, T>::value)
       {
-        return buffer_ = {lisp::vectored_cons_cells::type::atom, boost::lexical_cast<lisp::vectored_cons_cells::value_type>(buffer)};
+        return buffer_ = {boost::lexical_cast<value_type>(buffer)};
       }
       else
       {

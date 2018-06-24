@@ -3,32 +3,39 @@
 
 
 #include <iterator>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <corelisp/lisp/tokenizer.hpp>
+// #include <corelisp/utility/subrange_vector.hpp>
 #include <corelisp/utility/zip_iterator.hpp>
+
+
+// XXX フレンド関数群はプライベートメンバにアクセスしないのであれば外に居たほうが綺麗かも
 
 
 namespace lisp
 {
+  // ベクタードコンセル
+  // 気に入ってる名前だが英文的に正しく無さそうだし意味的にはフラットコンセルの方が良いかもしれぬ
   class vectored_cons_cells
     : public std::vector<vectored_cons_cells>
   {
-  public: // data members
-    enum class type { list, atom } state; // TODO deprecated
-
+  public: // attirbutes
     using value_type = std::string;
-    value_type value;
+    value_type value; // TODO to be constant
 
     using scope_type = std::unordered_map<std::string, std::shared_ptr<vectored_cons_cells>>;
     scope_type closure;
 
   public: // constructors
-    vectored_cons_cells(type state = type::list, const std::string& value = "")
-      : state {state}, value {value}
+    vectored_cons_cells(const value_type& value = "")
+      : value {value}
     {}
 
     template <typename InputIterator
@@ -38,18 +45,17 @@ namespace lisp
                               typename std::remove_reference<InputIterator>::type::value_type
                             >::value
                           >::type>
-    vectored_cons_cells(InputIterator&& first, InputIterator&& last)
-      : state {type::list}
+    vectored_cons_cells(InputIterator&& begin, InputIterator&& end)
     {
-      if (std::distance(first, last) != 0)
+      if (std::distance(begin, end) != 0)
       {
-        if (*first != "(")
+        if (*begin != "(")
         {
-          *this = {type::atom, *first};
+          (*this).value = *begin;
         }
-        else while (++first != last && *first != ")")
+        else while (++begin != end && *begin != ")")
         {
-          emplace_back(first, last);
+          emplace_back(begin, end);
         }
       }
     }
@@ -64,10 +70,36 @@ namespace lisp
       : vectored_cons_cells {std::begin(tokens), std::end(tokens)}
     {}
 
+  public: // accesses
+    bool is_atom() const noexcept // is_atomの方が良いだろうか
+    {
+      return std::empty(*this);
+    }
+
+    friend auto atom(const vectored_cons_cells& e) noexcept
+    {
+      return e.is_atom();
+    }
+
+  public: // operation
+    auto share() noexcept(noexcept(std::make_shared<vectored_cons_cells>(std::declval<vectored_cons_cells>())))
+    {
+      return std::make_shared<vectored_cons_cells>(*this);
+    }
+
   public: // operators
+    // TODO
+    // 真偽値型への暗黙キャスト演算子オーバーロードがあると面白いかも
+    // オペレータnull?を内部で呼ぶ感じで
+
     bool operator!=(const vectored_cons_cells& rhs) const noexcept
     {
-      if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
+      if (&(*this) == &rhs) // アドレスが等しい場合は即座に比較終了
+      {
+        return false;
+      }
+
+      if (std::size(*this) != std::size(rhs) or (*this).value != rhs.value)
       {
         return true;
       }
@@ -91,21 +123,18 @@ namespace lisp
     friend auto operator<<(std::ostream& os, const vectored_cons_cells& e)
       -> std::ostream&
     {
-      switch (e.state)
+      if (not e.is_atom())
       {
-      case type::list:
         os <<  '(';
         for (const auto& each : e)
         {
           os << each << (&each != &e.back() ? " " : "");
         }
         return os << ')';
-
-      default:
-        return os << e.value;
       }
+      else return os << e.value;
     }
-  } static true_ {vectored_cons_cells::type::atom, "true"}, false_;
+  } static true_ {"true"}, false_;
 } // namespace lisp
 
 
