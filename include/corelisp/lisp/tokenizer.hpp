@@ -1,5 +1,5 @@
-#ifndef INCLUDED_PURELISP_CORE_TOKENIZER_HPP
-#define INCLUDED_PURELISP_CORE_TOKENIZER_HPP
+#ifndef INCLUDED_CORELISP_LISP_TOKENIZER_HPP
+#define INCLUDED_CORELISP_LISP_TOKENIZER_HPP
 
 
 #include <algorithm>
@@ -10,7 +10,7 @@
 #include <vector>
 
 
-namespace purelisp { inline namespace core
+namespace lisp
 {
   class tokenizer
     : public std::vector<std::string>
@@ -81,8 +81,8 @@ namespace purelisp { inline namespace core
              });
     }
   } static tokenize;
-}} // namespace purelisp::core
+} // namespace lisp
 
 
-#endif // INCLUDED_PURELISP_CORE_TOKENIZER_HPP
+#endif // INCLUDED_CORELISP_LISP_TOKENIZER_HPP
 
