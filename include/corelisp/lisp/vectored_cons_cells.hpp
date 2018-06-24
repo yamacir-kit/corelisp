@@ -3,6 +3,7 @@
 
 
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -10,18 +11,21 @@
 #include <vector>
 
 #include <corelisp/lisp/tokenizer.hpp>
-// #include <corelisp/utility/vector_view.hpp>
+// #include <corelisp/utility/subrange_vector.hpp>
 #include <corelisp/utility/zip_iterator.hpp>
+
+
+// XXX フレンド関数群はプライベートメンバにアクセスしないのであれば外に居たほうが綺麗かも
 
 
 namespace lisp
 {
+  // ベクタードコンセル
+  // 気に入ってる名前だが英文的に正しく無さそうだし意味的にはフラットコンセルの方が良いかもしれぬ
   class vectored_cons_cells
     : public std::vector<vectored_cons_cells>
   {
   public: // attirbutes
-    // enum class type { list, atom } state; // TODO deprecated
-
     using value_type = std::string;
     value_type value; // TODO to be constant
 
@@ -29,9 +33,6 @@ namespace lisp
     scope_type closure;
 
   public: // constructors
-    // vectored_cons_cells(type state = type::list, const std::string& value = "")
-    //   : state {state}, value {value}
-    // {}
     vectored_cons_cells(const value_type& value = "")
       : value {value}
     {}
@@ -44,13 +45,11 @@ namespace lisp
                             >::value
                           >::type>
     vectored_cons_cells(InputIterator&& begin, InputIterator&& end)
-      // : state {type::list}
     {
       if (std::distance(begin, end) != 0)
       {
         if (*begin != "(")
         {
-          // *this = {type::atom, *first};
           (*this).value = *begin;
         }
         else while (++begin != end && *begin != ")")
@@ -82,6 +81,10 @@ namespace lisp
     }
 
   public: // operators
+    // TODO
+    // 真偽値型への暗黙キャスト演算子オーバーロードがあると面白いかも
+    // オペレータnull?を内部で呼ぶ感じで
+
     bool operator!=(const vectored_cons_cells& rhs) const noexcept
     {
       if (&(*this) == &rhs) // アドレスが等しい場合は即座に比較終了
@@ -89,7 +92,6 @@ namespace lisp
         return false;
       }
 
-      // if (std::size(*this) != std::size(rhs) || (*this).state != rhs.state || (*this).value != rhs.value)
       if (std::size(*this) != std::size(rhs) or (*this).value != rhs.value)
       {
         return true;
@@ -126,13 +128,6 @@ namespace lisp
       else return os << e.value;
     }
   } static true_ {"true"}, false_;
-
-
-  class vectored_cons_cells_view
-    : public utility::vector_view<vectored_cons_cells>
-  {
-  public:
-  };
 } // namespace lisp
 
 

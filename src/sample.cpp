@@ -12,13 +12,15 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/gmp.hpp>
 
+// ユーザが使うときはインクルード文自体を名前空間でラップして使うのが良さそう
+// 特にユーティリティライブラリ部分
 #include <corelisp/lisp/evaluator.hpp>
 #include <corelisp/lisp/tokenizer.hpp>
 #include <corelisp/lisp/vectored_cons_cells.hpp>
 #include <corelisp/builtin/arithmetic.hpp>
 
 
-auto define_origin_functions = [&]()
+auto define_builtins = [&]()
 {
   using namespace lisp;
 
@@ -31,8 +33,6 @@ auto define_origin_functions = [&]()
   evaluate["atom"] = [&](auto& e, auto& env)
     -> decltype(auto)
   {
-    // const auto& buffer {evaluate(expr.at(1), scope)};
-    // return buffer.state != vectored_cons_cells::type::atom && std::size(buffer) != 0 ? false_ : true_; // XXX これ正しい？
     return evaluate(e.at(1), env).atom() ? true_ : false_;
   };
 
@@ -97,14 +97,6 @@ auto define_origin_functions = [&]()
     scope.emplace(expr.at(1).value, std::make_shared<vectored_cons_cells>(evaluate(expr.at(2), scope)));
     return expr[2];
   };
-};
-
-
-auto define_scheme_functions = [&]()
-{
-  using namespace lisp;
-
-  define_origin_functions();
 
   evaluate["if"] = [&](auto& expr, auto& scope)
     -> decltype(auto)
@@ -146,14 +138,13 @@ int main(int argc, char** argv)
     std::exit(boost::exit_failure);
   }();
 
-  define_origin_functions();
-  define_scheme_functions();
+  define_builtins();
 
   std::vector<std::string> tests
   {
     "(define fib (lambda (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))",
     "(define tarai (lambda (x y z) (if (<= x y) y (tarai (tarai (- x 1) y z) (tarai (- y 1) z x) (tarai (- z 1) x y)))))",
-    "(define map (lambda (f e) (if (eq? e false) false (cons (f (car e)) (map f (cdr e))))))",
+    // "(define map (lambda (f e) (if (eq? e false) false (cons (f (car e)) (map f (cdr e))))))",
     "(define x (quote (1 2 3 4 5)))",
     "(define factorial (lambda (n) (cond ((< n 0) false) ((<= n 1) 1) (true (* n (factorial (- n 1)))))))"
   };
