@@ -27,19 +27,19 @@ auto define_builtins = [&]()
   evaluate["quote"] = [&](auto& e, auto&) noexcept
     -> decltype(auto)
   {
-    return std::size(e) != 2 ? false_ : e[1];
+    return std::size(e) != 2 ? false_value : e[1];
   };
 
   evaluate["atom"] = [&](auto& e, auto& env)
     -> decltype(auto)
   {
-    return evaluate(e.at(1), env).is_atom() ? true_ : false_;
+    return evaluate(e.at(1), env).is_atom() ? true_value : false_value;
   };
 
   evaluate["eq"] = [](auto& e, auto&) // XXX EQって可変長じゃなくても良かったっけ
     -> decltype(auto)
   {
-    return  e.at(1) != e.at(2) ? false_ : true_;
+    return  e.at(1) != e.at(2) ? false_value : true_value;
   };
 
   evaluate["car"] = [&](auto& expr, auto& scope) // TODO クソ
@@ -52,7 +52,7 @@ auto define_builtins = [&]()
     -> decltype(auto)
   {
     auto buffer {evaluate(expr.at(1), scope)};
-    return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : false_);
+    return expr = (std::size(buffer) != 0 ? buffer.erase(std::begin(buffer)), std::move(buffer) : false_value);
   };
 
   evaluate["cons"] = [&](auto& expr, auto& scope) // TODO クソ
@@ -75,13 +75,13 @@ auto define_builtins = [&]()
   {
     for (auto iter {std::begin(e) + 1}; iter != std::end(e); ++iter)
     {
-      if (evaluate(iter->at(0), env) != false_)
+      if (evaluate(iter->at(0), env) != false_value)
       {
         return evaluate(iter->at(1), env);
       }
     }
 
-    return false_; // TODO
+    return false_value; // TODO
   };
 
   evaluate["lambda"] = [](auto& expr, auto& scope)
@@ -94,13 +94,13 @@ auto define_builtins = [&]()
   evaluate["define"] = [&](auto& e, auto& env) noexcept
     -> decltype(auto)
   {
-    return std::size(e) != 3 ? false_ : (env.emplace(e[1].value, evaluate(e[2], env).share()), e[2]);
+    return std::size(e) != 3 ? false_value : (env.emplace(e[1].value, evaluate(e[2], env).share()), e[2]);
   };
 
   evaluate["if"] = [&](auto& e, auto& env) noexcept
     -> decltype(auto)
   {
-    return std::size(e) != 4 ? false_ : evaluate(evaluate(e[1], env) != false_ ? e[2] : e[3], env);
+    return std::size(e) != 4 ? false_value : evaluate(evaluate(e[1], env) != false_value ? e[2] : e[3], env);
   };
 
   using value_type = boost::multiprecision::mpf_float;
@@ -173,7 +173,7 @@ int main(int argc, char** argv)
   // library += "))";
   //
   // std::cout << "[debug] library evaluation "
-  //           << (lisp::evaluate(library) != lisp::false_ ? "succeeded" : "failed")
+  //           << (lisp::evaluate(library) != lisp::false_value ? "succeeded" : "failed")
   //           << "\n\n";
 
   for (std::string buffer {}; std::cout << ">> ", std::getline(std::cin, buffer);)

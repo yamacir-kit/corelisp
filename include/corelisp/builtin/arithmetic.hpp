@@ -75,7 +75,7 @@ namespace builtin
       }
       else
       {
-        return buffer != 0 ? lisp::true_ : lisp::false_;
+        return buffer != 0 ? lisp::true_value : lisp::false_value;
       }
     }
   };

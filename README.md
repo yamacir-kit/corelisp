@@ -1,6 +1,6 @@
 # Lisp interpreter core library by C++17
 
-Version 1.0.58 in development.
+Version 1.0.66 in development.
 
 ## Overview
 

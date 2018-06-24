@@ -134,7 +134,7 @@ namespace lisp
       }
       else return os << e.value;
     }
-  } static true_ {"true"}, false_;
+  } static true_value {"true"}, false_value;
 } // namespace lisp
 
 
