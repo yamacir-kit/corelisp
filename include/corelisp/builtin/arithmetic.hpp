@@ -20,6 +20,7 @@ namespace builtin
     = typename std::add_const<typename std::add_lvalue_reference<T>::type>;
 
 
+  // XXX 全体的に雑すぎる
   template <typename T, template <typename...> typename BinaryOperator
   , typename = typename std::enable_if<
                           std::is_same<
@@ -75,7 +76,7 @@ namespace builtin
       }
       else
       {
-        return buffer != 0 ? lisp::true_ : lisp::false_;
+        return buffer != 0 ? lisp::true_value : lisp::false_value;
       }
     }
   };

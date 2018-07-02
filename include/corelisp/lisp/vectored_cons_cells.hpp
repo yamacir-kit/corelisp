@@ -21,7 +21,6 @@
 
 namespace lisp
 {
-  // ベクタードコンセル
   // 気に入ってる名前だが英文的に正しく無さそうだし意味的にはフラットコンセルの方が良いかもしれぬ
   class vectored_cons_cells
     : public std::vector<vectored_cons_cells>
@@ -71,7 +70,7 @@ namespace lisp
     {}
 
   public: // accesses
-    bool is_atom() const noexcept // is_atomの方が良いだろうか
+    bool is_atom() const noexcept
     {
       return std::empty(*this);
     }
@@ -134,7 +133,7 @@ namespace lisp
       }
       else return os << e.value;
     }
-  } static true_ {"true"}, false_;
+  } static true_value {"true"}, false_value;
 } // namespace lisp
 
 

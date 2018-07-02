@@ -27,8 +27,7 @@ namespace lisp
 
     static inline scope_type env_
     {
-      {"true",  std::make_shared<cells_type>("true")},
-      {"false", std::make_shared<cells_type>()}
+      {"true", true_value.share()}, {"false", false_value.share()}
     };
 
   public:
@@ -88,7 +87,7 @@ namespace lisp
     catch (const std::exception& ex)
     {
       std::cerr << "(error " << ex.what() << " in expression \e[31m" << e << "\e[0m) -> " << std::flush;
-      return false_;
+      return false_value;
     }
   } static evaluate;
 } // namespace lisp
