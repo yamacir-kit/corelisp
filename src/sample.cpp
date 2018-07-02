@@ -12,8 +12,6 @@
 #include <boost/cstdlib.hpp>
 #include <boost/multiprecision/gmp.hpp>
 
-// ユーザが使うときはインクルード文自体を名前空間でラップして使うのが良さそう
-// 特にユーティリティライブラリ部分
 #include <corelisp/lisp/evaluator.hpp>
 #include <corelisp/lisp/tokenizer.hpp>
 #include <corelisp/lisp/vectored_cons_cells.hpp>
