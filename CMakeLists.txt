@@ -35,3 +35,8 @@ foreach(EACH IN LISTS ${PROJECT_NAME}_SOURCES)
   target_link_libraries(${TARGET} ${Boost_LIBRARIES} gmp)
 endforeach()
 
+install(
+  DIRECTORY ${${PROJECT_NAME}_INCLUDE_DIR}/
+  DESTINATION /usr/local/include
+)
+
