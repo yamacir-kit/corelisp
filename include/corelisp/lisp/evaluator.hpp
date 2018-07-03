@@ -86,7 +86,7 @@ namespace lisp
     }
     catch (const std::exception& ex)
     {
-      std::cerr << "(error " << ex.what() << " in expression \e[31m" << e << "\e[0m) -> " << std::flush;
+      std::cerr << "(error: " << ex.what() << " in expression \e[31m" << e << "\e[0m) -> " << std::flush;
       return false_value;
     }
   } static evaluate;

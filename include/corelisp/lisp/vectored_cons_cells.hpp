@@ -71,7 +71,7 @@ namespace lisp
   public: // accesses
     bool is_atom() const noexcept
     {
-      return std::empty(*this);
+      return std::empty(*this) and not std::empty(value);
     }
 
     friend auto atom(const vectored_cons_cells& e) noexcept
